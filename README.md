@@ -66,7 +66,10 @@ This is a Node.js backend application built with Express.js and TypeScript, desi
 
 2. Access the API at http://localhost:3000
 
-3. Access TCP at telnet localhost 8080
+3. Access TCP 
+   ```bash
+   telnet localhost 8080
+   ```
 
 ## Usage
 
