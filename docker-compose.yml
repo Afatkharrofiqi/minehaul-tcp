@@ -1,0 +1,44 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api-minehaul-tcp
+    restart: unless-stopped
+    ports:
+      - '${PORT}:${PORT}'
+      - '${TCP_PORT}:${TCP_PORT}'
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    command: npm run start:dev # start:dev or start:prod
+    depends_on:
+      - postgres
+    networks:
+      - minehaulnet
+
+  postgres:
+    image: postgres:latest
+    container_name: pgdb
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - '${DB_PORT}:${DB_PORT}'
+    networks:
+      - minehaulnet
+
+volumes:
+  postgres_data:
+
+
+networks:
+  minehaulnet:
+    driver: bridge
