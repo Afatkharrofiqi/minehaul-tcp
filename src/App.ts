@@ -1,6 +1,6 @@
 import express, { Application } from 'express';
-import { DataSource } from 'typeorm';
 
+import { Database } from './configs/Database';
 import { ApiRouter } from './routes/ApiRouter';
 
 export class App {
@@ -9,7 +9,7 @@ export class App {
   constructor(
     expressInstance: Application,
     private apiRouter: ApiRouter,
-    private dataSource: DataSource
+    private dataSource: Database
   ) {
     this.app = expressInstance;
     this.initializeMiddlewares();
@@ -27,7 +27,7 @@ export class App {
 
   private async connectToDatabase(): Promise<void> {
     try {
-      await this.dataSource.initialize();
+      await this.dataSource.connect();
       console.log('Connected to the database successfully.');
     } catch (error) {
       console.error('Database connection failed:', error);

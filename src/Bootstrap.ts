@@ -8,15 +8,9 @@ import { TcpRoute } from './routes/v1/TcpRoute';
 import { TcpService } from './services/TcpService';
 
 export class Bootstrap {
-  private db: Database;
-
-  constructor() {
-    this.db = new Database();
-  }
-
   public async init(): Promise<App> {
     const router = Router();
-    const dataSource = this.db.getDataSource();
+    const dataSource = new Database();
     const tcpService = new TcpService();
 
     const tcpController = new TcpController(tcpService);
