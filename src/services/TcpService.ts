@@ -28,8 +28,7 @@ const parseCodec8Extended = (buffer: Buffer): Codec8ExtendedPacket | null => {
   try {
     // Check minimum length to avoid out-of-range errors
     if (buffer.length < 29) {
-      console.error(`Buffer too short, length: ${buffer.length}`);
-      return null;
+      throw new Error(`Buffer too short, length: ${buffer.length}`);
     }
 
     const codecId = buffer.readUInt8(0);
@@ -60,7 +59,7 @@ const parseCodec8Extended = (buffer: Buffer): Codec8ExtendedPacket | null => {
 
     return { codecId, timestamp: Number(timestamp), priority, gps, ioElements };
   } catch (error) {
-    console.error('Failed to parse packet:', error.message);
+    Logger.error(`Failed to parse packet: ${error}`);
     return null;
   }
 };
