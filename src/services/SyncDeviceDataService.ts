@@ -18,12 +18,12 @@ export class SyncDeviceDataService {
     const syncDeviceData = this.repo.create({
       timestamp: decodedData.timestamp,
       priority: decodedData.priority,
-      latitude: decodedData.gpsData.latitude,
-      longitude: decodedData.gpsData.longitude,
-      altitude: decodedData.gpsData.altitude,
-      angle: decodedData.gpsData.angle,
-      satellites: decodedData.gpsData.satellites,
-      speed: decodedData.gpsData.speed,
+      latitude: decodedData.gpsData?.latitude,
+      longitude: decodedData.gpsData?.longitude,
+      altitude: decodedData.gpsData?.altitude,
+      angle: decodedData.gpsData?.angle,
+      satellites: decodedData.gpsData?.satellites,
+      speed: decodedData.gpsData?.speed,
       io_elements: decodedData.ioElements, // Save IO elements as a JSON object
     });
 

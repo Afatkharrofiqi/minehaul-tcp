@@ -1,9 +1,7 @@
-// src/utils/Codec8EParser.ts
-
 export interface DecodedPacket {
   timestamp: Date;
   priority: number;
-  gpsData: {
+  gpsData?: {
     latitude: number;
     longitude: number;
     altitude: number;
@@ -11,33 +9,38 @@ export interface DecodedPacket {
     satellites: number;
     speed: number;
   };
-  ioElements: Record<number, number>;
+  ioElements?: Record<number, number>;
+  rawData: string;
 }
 
 export class Codec8EParser {
   public static parsePacket(data: Buffer): DecodedPacket {
-    console.log(`Received data length: ${data.length}`); // Print the length of the received data
+    console.log(`Received data length: ${data.length}`);
+    console.log(`Hex data: ${data.toString('hex')}`); // Log the raw data in hex format
 
+    // Check if the packet is too short for a full Codec 8 Extended packet
     if (data.length < 25) {
-      // Check if the packet length is at least 25 bytes
-      throw new Error(
-        `Data packet is too short: ${data.length} bytes. Expected at least 25 bytes.`
-      );
+      // Log a warning and return a partially parsed packet or raw data for future analysis
+      return {
+        timestamp: new Date(), // Use current time as a placeholder
+        priority: 0,
+        rawData: data.toString('hex'),
+      };
     }
 
     const dataView = new DataView(data.buffer);
 
-    // Example parsing logic based on length, replace with actual structure if needed.
+    // Parse the first few fields if the data length is sufficient
     const timestamp = new Date(Number(dataView.getBigInt64(0))); // 8 bytes for timestamp
     const priority = data.readUInt8(8); // 1 byte for priority
 
     // Parse GPS Data (replace with correct offset and length)
     const latitude = data.readInt32BE(9) / 10000000;
     const longitude = data.readInt32BE(13) / 10000000;
-    const altitude = data.readInt16BE(17); // This line causes error if packet length < 19
-    const angle = data.readUInt16BE(19); // This line causes error if packet length < 21
-    const satellites = data.readUInt8(21); // This line causes error if packet length < 22
-    const speed = data.readUInt16BE(22); // This line causes error if packet length < 24
+    const altitude = data.readInt16BE(17);
+    const angle = data.readUInt16BE(19);
+    const satellites = data.readUInt8(21);
+    const speed = data.readUInt16BE(22);
 
     const gpsData = { latitude, longitude, altitude, angle, satellites, speed };
 
@@ -59,6 +62,12 @@ export class Codec8EParser {
       offset += 2; // Move to next IO element
     }
 
-    return { timestamp, priority, gpsData, ioElements };
+    return {
+      timestamp,
+      priority,
+      gpsData,
+      ioElements,
+      rawData: data.toString('hex'),
+    };
   }
 }
