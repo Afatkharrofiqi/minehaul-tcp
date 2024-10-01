@@ -11,7 +11,7 @@ export class SyncDeviceData {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'bytea', nullable: true })
   data!: Buffer;
 
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
