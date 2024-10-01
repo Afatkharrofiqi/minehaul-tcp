@@ -45,14 +45,30 @@ export class Codec8EParser {
         rawData: data.toString('hex'),
       };
     }
+    // Extract IMEI (assuming it's located at bytes 2-17)
+    const imei = data.subarray(2, 17).toString();
+    Logger.log(`Decoded IMEI: ${imei}`);
+
     // Correct timestamp extraction: 8 bytes after IMEI (milliseconds since Unix epoch)
-    const timestampBuffer = data.slice(17, 25);
-    const timestampMs = parseInt(timestampBuffer.toString('hex'), 16);
-    const timestamp = new Date(timestampMs); // Create a Date object from milliseconds
+    const timestampBuffer = data.subarray(17, 25);
+
+    // Convert the 8-byte buffer to a BigInt and create a Date object from milliseconds
+    const timestampMs = BigInt(`0x${timestampBuffer.toString('hex')}`);
+
+    // Check if the timestamp value is within the valid range of JavaScript Dates
+    const maxJsDateMs = BigInt(Number.MAX_SAFE_INTEGER); // Max safe value for JavaScript Date (about 285,616 years)
+    if (timestampMs > maxJsDateMs) {
+      throw new Error(`Invalid timestamp value: ${timestampMs.toString()}`);
+    }
+
+    // Create a JavaScript Date object
+    const timestamp = new Date(Number(timestampMs));
 
     // Validate timestamp
     if (isNaN(timestamp.getTime())) {
-      throw new Error(`Invalid timestamp value: ${timestampMs}`);
+      throw new Error(
+        `Invalid timestamp value after conversion: ${timestampMs.toString()}`
+      );
     }
     // Extract Priority (1 byte following Timestamp)
     const priority = parseInt(data.subarray(25, 26).toString('hex'), 16);
