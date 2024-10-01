@@ -23,9 +23,9 @@ export class TcpService {
       console.log(`Received data: ${data}`);
 
       try {
-        await this.syncServiceData.insert(data.toString());
+        await this.syncServiceData.insert(data);
         // Echo back the data
-        socket.write(`Data logged successfully: ${data.toString()}`);
+        socket.write(`Data logged successfully: ${data}`);
         console.log('Data logged successfully.');
       } catch (error) {
         socket.write(`Failed to log data.`);

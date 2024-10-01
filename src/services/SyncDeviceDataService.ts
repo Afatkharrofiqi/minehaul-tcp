@@ -9,7 +9,7 @@ export class SyncDeviceDataService {
     this.repo = this.dataSource.getRepository(SyncDeviceData);
   }
 
-  async insert(data: string): Promise<SyncDeviceData> {
+  async insert(data: Buffer): Promise<SyncDeviceData> {
     const syncDeviceData = this.repo.create({
       data,
     });

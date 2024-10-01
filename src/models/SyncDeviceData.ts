@@ -12,7 +12,7 @@ export class SyncDeviceData {
   id!: number;
 
   @Column({ type: 'text', nullable: true })
-  data!: string;
+  data!: Buffer;
 
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
