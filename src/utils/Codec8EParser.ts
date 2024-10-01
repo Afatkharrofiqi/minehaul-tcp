@@ -40,9 +40,6 @@ export interface DecodedPacket {
 
 export class Codec8EParser {
   public static parsePacket(data: Buffer): DecodedPacket {
-    Logger.log(`Received data length: ${data.length}`);
-    Logger.log(`Hex data: ${data.toString('hex')}`); // Log the raw data in hex format
-
     // Check if the packet is too short for a full Codec 8 Extended packet
     if (data.length < 25) {
       // Log a warning and return a partially parsed packet or raw data for future analysis
