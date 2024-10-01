@@ -23,6 +23,7 @@ function parseTeltonikaData(buffer: Buffer) {
   // Codec ID (1 byte)
   const codecId = buffer.readUInt8(offset);
   offset += 1;
+  Logger.log(`CodecID: ${codecId}`);
 
   if (codecId !== 0x8e) {
     Logger.log('Unsupported codec. Expected Codec 8 Extended.');
