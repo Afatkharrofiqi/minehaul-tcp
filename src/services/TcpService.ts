@@ -1,8 +1,8 @@
-// src/services/TcpService.ts
 import { Server, Socket } from 'net';
 
 import { TcpConfig } from '../configs/TcpConfig';
 import { Codec8EParser } from '../utils/Codec8EParser';
+import { Logger } from '../utils/Logger';
 import { SyncDeviceDataService } from './SyncDeviceDataService';
 
 export class TcpService {
@@ -15,13 +15,13 @@ export class TcpService {
   }
 
   private async handleConnection(socket: Socket): Promise<void> {
-    console.log(
+    Logger.log(
       `Client connected: ${socket.remoteAddress}:${socket.remotePort}`
     );
 
-    // Listen for data from the client
     socket.on('data', async (data) => {
-      console.log(`Received data: ${data.toString('hex')}`); // Log raw data in hexadecimal format
+      Logger.log(`Received raw data: ${data.toString('hex')}`);
+      Logger.log(`Data length: ${data.length} bytes`);
 
       try {
         // Parse the incoming data using Codec 8E parser
@@ -32,28 +32,26 @@ export class TcpService {
 
         // Respond to the client
         socket.write(`Data logged successfully.`);
-        console.log('Data logged successfully.');
+        Logger.log('Data logged successfully.');
       } catch (error) {
         socket.write(`Failed to log data.`);
-        console.error('Failed to log data:', error);
+        Logger.error(`Failed to log data: ${error}`);
       }
     });
 
-    // Handle client disconnection
     socket.on('end', () => {
-      console.log('Client disconnected');
+      Logger.log('Client disconnected');
     });
 
-    // Handle errors
     socket.on('error', (err) => {
-      console.error(`Socket error: ${err}`);
+      Logger.error(`Socket error: ${err}`);
     });
   }
 
   public startServer(): void {
     const { host, port } = TcpConfig;
     this.server.listen(port, host, () => {
-      console.log(`TCP Server is running on ${host}:${port}`);
+      Logger.log(`TCP Server is running on ${host}:${port}`);
     });
   }
 }
