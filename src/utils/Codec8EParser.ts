@@ -88,7 +88,7 @@ export class Codec8EParser {
       }
       const ioId = data.readUInt8(offset); // 1 byte for IO ID
       const ioValueLength = data.readUInt8(offset + 1); // Length of the IO value
-      const ioValue = data.slice(offset + 2, offset + 2 + ioValueLength); // Extract value
+      const ioValue = data.subarray(offset + 2, offset + 2 + ioValueLength); // Extract value
 
       // Special handling for BLE data based on specific IO IDs
       if (ioId === 200 || ioId === 201 || ioId === 202) {

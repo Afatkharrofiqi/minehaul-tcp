@@ -26,7 +26,7 @@ export class TcpService {
         // Check if it's the initial IMEI packet
         if (data.length === 17) {
           // Extract IMEI from the first packet (skip 2 bytes and read 15 ASCII characters)
-          const imei = Buffer.from(data, 2).toString('ascii');
+          const imei = data.subarray(2).toString('ascii');
           Logger.log(`Received IMEI: ${imei}`);
 
           // Respond to the client acknowledging the IMEI
