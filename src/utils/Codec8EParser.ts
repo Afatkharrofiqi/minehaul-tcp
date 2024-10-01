@@ -113,6 +113,15 @@ export class Codec8EParser {
     Logger.log(
       `Parsing BLE Data for IO ID: ${ioId}, IO Value: ${ioValue.toString('hex')}`
     );
+
+    if (ioValue.length < 9) {
+      // Adjust this value based on the minimum required length for BLE data
+      Logger.warn(
+        `BLE data for IO ID ${ioId} is too short: ${ioValue.length} bytes`
+      );
+      return `Insufficient BLE data for IO ID ${ioId}`;
+    }
+
     switch (ioId) {
       case 200:
         return this.parseBLESensorData(ioValue);
