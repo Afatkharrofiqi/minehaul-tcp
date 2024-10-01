@@ -2,6 +2,7 @@
 import { Server, Socket } from 'net';
 
 import { TcpConfig } from '../configs/TcpConfig';
+import { Codec8EParser } from '../utils/Codec8EParser';
 import { SyncDeviceDataService } from './SyncDeviceDataService';
 
 export class TcpService {
@@ -13,19 +14,24 @@ export class TcpService {
     this.syncServiceData = syncServiceData;
   }
 
-  private handleConnection(socket: Socket): void {
+  private async handleConnection(socket: Socket): Promise<void> {
     console.log(
       `Client connected: ${socket.remoteAddress}:${socket.remotePort}`
     );
 
     // Listen for data from the client
     socket.on('data', async (data) => {
-      console.log(`Received data: ${data}`);
+      console.log(`Received data: ${data.toString('hex')}`); // Log raw data in hexadecimal format
 
       try {
-        await this.syncServiceData.insert(data);
-        // Echo back the data
-        socket.write(`Data logged successfully: ${data}`);
+        // Parse the incoming data using Codec 8E parser
+        const decodedData = Codec8EParser.parsePacket(data);
+
+        // Save parsed data into the database
+        await this.syncServiceData.insert(decodedData);
+
+        // Respond to the client
+        socket.write(`Data logged successfully.`);
         console.log('Data logged successfully.');
       } catch (error) {
         socket.write(`Failed to log data.`);
