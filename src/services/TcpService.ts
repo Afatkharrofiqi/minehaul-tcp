@@ -4,65 +4,65 @@ import { TcpConfig } from '../configs/TcpConfig';
 import { Logger } from '../utils/Logger';
 import { SyncDeviceDataService } from './SyncDeviceDataService';
 
-interface Codec8ExtendedPacket {
-  codecId: number;
-  timestamp: number;
-  priority: number;
-  gps: {
-    longitude: number;
-    latitude: number;
-    altitude: number;
-    angle: number;
-    satellites: number;
-    speed: number;
-  };
-  ioElements: {
-    eventId: number;
-    totalIO: number;
-    ioData: { [key: number]: number };
-  };
-}
+// interface Codec8ExtendedPacket {
+//   codecId: number;
+//   timestamp: number;
+//   priority: number;
+//   gps: {
+//     longitude: number;
+//     latitude: number;
+//     altitude: number;
+//     angle: number;
+//     satellites: number;
+//     speed: number;
+//   };
+//   ioElements: {
+//     eventId: number;
+//     totalIO: number;
+//     ioData: { [key: number]: number };
+//   };
+// }
 
 // Function to parse the received buffer data
-const parseCodec8Extended = (buffer: Buffer): Codec8ExtendedPacket | null => {
-  try {
-    // Check minimum length to avoid out-of-range errors
-    if (buffer.length < 29) {
-      throw new Error(`Buffer too short, length: ${buffer.length}`);
-    }
+// const parseCodec8Extended = (buffer: Buffer): Codec8ExtendedPacket | null => {
+//   try {
+//     // Check minimum length to avoid out-of-range errors
+//     if (buffer.length < 29) {
+//       throw new Error(`Buffer too short, length: ${buffer.length}`);
+//     }
 
-    const codecId = buffer.readUInt8(0);
-    const timestamp = buffer.readBigUInt64BE(1);
-    const priority = buffer.readUInt8(9);
+//     const codecId = buffer.readUInt8(0);
+//     const timestamp = buffer.readBigUInt64BE(1);
+//     const priority = buffer.readUInt8(9);
 
-    // Verify the buffer length for GPS and IO data
-    if (buffer.length < 27)
-      throw new Error('Buffer too short for GPS and IO data');
+//     // Verify the buffer length for GPS and IO data
+//     if (buffer.length < 27)
+//       throw new Error('Buffer too short for GPS and IO data');
 
-    const gps = {
-      longitude: buffer.readInt32BE(10),
-      latitude: buffer.readInt32BE(14),
-      altitude: buffer.readInt16BE(18),
-      angle: buffer.readUInt16BE(20),
-      satellites: buffer.readUInt8(22),
-      speed: buffer.readUInt16BE(23),
-    };
+//     const gps = {
+//       longitude: buffer.readInt32BE(10),
+//       latitude: buffer.readInt32BE(14),
+//       altitude: buffer.readInt16BE(18),
+//       angle: buffer.readUInt16BE(20),
+//       satellites: buffer.readUInt8(22),
+//       speed: buffer.readUInt16BE(23),
+//     };
 
-    const ioElements = {
-      eventId: buffer.readUInt8(25),
-      totalIO: buffer.readUInt8(26),
-      ioData: {
-        1: buffer.readUInt8(27),
-        2: buffer.length > 28 ? buffer.readUInt8(28) : 0, // Conditional check to prevent out-of-range access
-      },
-    };
+//     const ioElements = {
+//       eventId: buffer.readUInt8(25),
+//       totalIO: buffer.readUInt8(26),
+//       ioData: {
+//         1: buffer.readUInt8(27),
+//         2: buffer.length > 28 ? buffer.readUInt8(28) : 0, // Conditional check to prevent out-of-range access
+//       },
+//     };
 
-    return { codecId, timestamp: Number(timestamp), priority, gps, ioElements };
-  } catch (error) {
-    Logger.error(`Failed to parse packet: ${error}`);
-    return null;
-  }
-};
+//     return { codecId, timestamp: Number(timestamp), priority, gps, ioElements };
+//   } catch (error) {
+//     Logger.error(`Failed to parse packet: ${error}`);
+//     return null;
+//   }
+// };
 
 export class TcpService {
   private server: Server;
@@ -120,16 +120,15 @@ export class TcpService {
     // });
 
     socket.on('data', (data) => {
-      Logger.log(`Data received: ${data}`);
+      const codecId = data.readUInt8(0);
+      console.log(`Codec ID: ${codecId}`);
+      if (codecId === 142) {
+        console.log('This is Codec 8 Extended data.');
+      } else {
+        console.log('This is not Codec 8 Extended data.');
+      }
 
-      // Parse the received data as a Codec 8 Extended packet
-      const packet = parseCodec8Extended(data);
-
-      Logger.log(`Parsed packet: ${packet}`);
-
-      // Send acknowledgment to client if needed
-      const response = Buffer.from([0x01]);
-      socket.write(response);
+      socket.write(data);
     });
 
     socket.on('end', () => {
