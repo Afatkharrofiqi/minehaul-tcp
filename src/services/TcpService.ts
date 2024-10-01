@@ -1,4 +1,3 @@
-// src/services/TcpService.ts
 import { Server, Socket } from 'net';
 
 import { TcpConfig } from '../configs/TcpConfig';
@@ -26,6 +25,18 @@ export class TcpService {
       Logger.log(`Data length: ${data.length} bytes`);
 
       try {
+        // Check if it's the initial IMEI packet
+        if (data.length === 17) {
+          // Extract IMEI from the first packet (skip 2 bytes and read 15 ASCII characters)
+          const imei = data.slice(2).toString('ascii');
+          Logger.log(`Received IMEI: ${imei}`);
+
+          // Respond to the client acknowledging the IMEI
+          socket.write(Buffer.from([0x01])); // Acknowledge the IMEI
+
+          return; // Stop further processing as this is only IMEI acknowledgment
+        }
+
         // Parse the incoming data using Codec 8E parser
         const decodedData: DecodedPacket = Codec8EParser.parsePacket(data);
 
