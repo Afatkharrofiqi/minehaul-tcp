@@ -1,10 +1,12 @@
-// src/configs/TcpConfig.ts
 export class TcpConfig {
-  public host: string;
-  public port: number;
+  public static host: string = process.env.TCP_HOST || '127.0.0.1';
+  public static port: number = Number(process.env.TCP_PORT) || 8080;
 
-  constructor() {
-    this.host = process.env.TCP_HOST || '127.0.0.1';
-    this.port = Number(process.env.TCP_PORT) || 8080;
+  public static getHost(): string {
+    return this.host;
+  }
+
+  public static getPort(): number {
+    return this.port;
   }
 }

@@ -14,11 +14,12 @@ export class Bootstrap {
     const tcpService = new TcpService();
 
     const tcpController = new TcpController(tcpService);
+
     const tcpRoute = new TcpRoute(tcpController, router);
 
     const apiRouter = new ApiRouter(tcpRoute, router);
 
-    const app = new App(express(), apiRouter, dataSource);
+    const app = new App(express(), apiRouter, dataSource, tcpService);
 
     return app;
   }
@@ -26,8 +27,7 @@ export class Bootstrap {
   public async start(): Promise<void> {
     const app = await this.init();
     app.serve();
-    const tcpService = new TcpService();
-    tcpService.startServer();
+    app.serveTcp();
   }
 }
 

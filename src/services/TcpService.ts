@@ -5,11 +5,9 @@ import { TcpConfig } from '../configs/TcpConfig';
 
 export class TcpService {
   private server: Server;
-  private config: TcpConfig;
 
   constructor() {
     this.server = new Server(this.handleConnection.bind(this));
-    this.config = new TcpConfig();
   }
 
   private handleConnection(socket: Socket): void {
@@ -36,7 +34,7 @@ export class TcpService {
   }
 
   public startServer(): void {
-    const { host, port } = this.config;
+    const { host, port } = TcpConfig;
     this.server.listen(port, host, () => {
       console.log(`TCP Server is running on ${host}:${port}`);
     });

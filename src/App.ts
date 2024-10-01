@@ -1,17 +1,17 @@
-import express, { Application } from 'express';
+import express, { Application, Request, Response } from 'express';
 
+import { AppConfig } from './configs/AppConfig';
 import { Database } from './configs/Database';
 import { ApiRouter } from './routes/ApiRouter';
+import { TcpService } from './services/TcpService';
 
 export class App {
-  public app: Application;
-
   constructor(
-    expressInstance: Application,
-    private apiRouter: ApiRouter,
-    private dataSource: Database
+    private readonly app: Application,
+    private readonly apiRouter: ApiRouter,
+    private readonly dataSource: Database,
+    private readonly tcpService: TcpService
   ) {
-    this.app = expressInstance;
     this.initializeMiddlewares();
     this.initializeRoutes();
     this.connectToDatabase();
@@ -22,7 +22,12 @@ export class App {
   }
 
   private initializeRoutes(): void {
+    this.app.get('/', this.handleRootRoute);
     this.app.use('/api', this.apiRouter.router);
+  }
+
+  private handleRootRoute(req: Request, res: Response): void {
+    res.send('Welcome to the API Minehaul');
   }
 
   private async connectToDatabase(): Promise<void> {
@@ -34,10 +39,13 @@ export class App {
     }
   }
 
+  public serveTcp(): void {
+    this.tcpService.startServer();
+  }
+
   public serve(): void {
-    const port = process.env.PORT || 3000;
-    this.app.listen(port, () => {
-      console.log(`Server is running on http://localhost:${port}`);
+    this.app.listen(AppConfig.port, () => {
+      console.log(`Server is running on http://localhost:${AppConfig.port}`);
     });
   }
 }
