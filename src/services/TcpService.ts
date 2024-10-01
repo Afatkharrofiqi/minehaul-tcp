@@ -44,7 +44,7 @@ export class TcpService {
         }
 
         // Save parsed data to the database
-        // await this.syncServiceData.insert(decodedData);
+        await this.syncServiceData.insert(decodedData);
 
         // Acknowledge successful data logging
         socket.write(Buffer.from([0x01])); // Send acknowledgement byte (for example)
