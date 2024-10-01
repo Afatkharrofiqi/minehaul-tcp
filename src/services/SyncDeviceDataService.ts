@@ -12,9 +12,7 @@ export class SyncDeviceDataService {
   }
 
   async insert(decodedData: DecodedPacket): Promise<SyncDeviceData> {
-    Logger.log(
-      `Inserting data into the database: ${JSON.stringify(decodedData)}`
-    );
+    Logger.log(`Inserting data into the database`);
 
     // Create a new SyncDeviceData entity instance with the decoded data
     const syncDeviceData = this.repo.create({
