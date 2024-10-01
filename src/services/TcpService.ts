@@ -1,4 +1,3 @@
-// src/services/TcpService.ts
 import { Server, Socket } from 'net';
 
 import { TcpConfig } from '../configs/TcpConfig';
@@ -25,6 +24,18 @@ export class TcpService {
       Logger.log(`Data length: ${data.length} bytes`);
 
       try {
+        // Check if the data is an IMEI (typically 15 ASCII characters encoded in hexadecimal)
+        const isImeiPacket = this.isImeiPacket(data);
+
+        if (isImeiPacket) {
+          const imei = this.extractImei(data);
+          Logger.log(`Received IMEI: ${imei}`);
+
+          // Respond to the client acknowledging the IMEI
+          socket.write(`IMEI received: ${imei}`);
+          return;
+        }
+
         // Parse the incoming data using Codec 8E parser
         const decodedData: DecodedPacket = Codec8EParser.parsePacket(data);
 
@@ -56,6 +67,17 @@ export class TcpService {
     socket.on('error', (err) => {
       Logger.error(`Socket error: ${err}`);
     });
+  }
+
+  private isImeiPacket(data: Buffer): boolean {
+    // Check if the packet length is 17 bytes and matches the pattern of an IMEI number
+    const possibleImei = data.slice(2).toString(); // Skip the first 2 bytes, assuming it's length/header
+    const imeiRegex = /^\d{15}$/; // Regular expression to check for 15-digit IMEI
+    return imeiRegex.test(possibleImei);
+  }
+
+  private extractImei(data: Buffer): string {
+    return data.slice(2).toString(); // Extract the IMEI number from the buffer, skip the first 2 bytes
   }
 
   public startServer(): void {
