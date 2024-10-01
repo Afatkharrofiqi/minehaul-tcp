@@ -83,10 +83,6 @@ export class Codec8EParser {
       const ioValueLength = data.readUInt8(offset + 1);
       const ioValue = data.subarray(offset + 2, offset + 2 + ioValueLength);
 
-      Logger.log(
-        `IO ID: ${ioId}, IO Value Length: ${ioValueLength}, IO Value: ${ioValue.toString('hex')}`
-      );
-
       if (ioId === 200 || ioId === 201 || ioId === 202) {
         const parsedBLEData = this.parseBLEData(ioId, ioValue);
         Logger.log(
