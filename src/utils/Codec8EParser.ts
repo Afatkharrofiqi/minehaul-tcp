@@ -45,16 +45,26 @@ export class Codec8EParser {
         rawData: data.toString('hex'),
       };
     }
-
-    // Convert bigint to number safely
-    const timestamp = new Date(Number(data.readBigUInt64BE(0))); // Corrected timestamp extraction
-    const priority = data.readUInt8(8);
-    const latitude = data.readInt32BE(9) / 10000000;
-    const longitude = data.readInt32BE(13) / 10000000;
-    const altitude = data.readInt16BE(17);
-    const angle = data.readUInt16BE(19);
-    const satellites = data.readUInt8(21);
-    const speed = data.readUInt16BE(22);
+    // Extract the Timestamp (8 bytes after the IMEI)
+    const timestamp = new Date(
+      parseInt(data.subarray(17, 25).toString('hex'), 16)
+    );
+    // Extract Priority (1 byte following Timestamp)
+    const priority = parseInt(data.subarray(25, 26).toString('hex'), 16);
+    // Extract Longitude (4 bytes following Priority)
+    const longitude =
+      parseInt(data.subarray(26, 30).toString('hex'), 16) / 10000000;
+    // Extract Latitude (4 bytes following Longitude)
+    const latitude =
+      parseInt(data.subarray(30, 34).toString('hex'), 16) / 10000000;
+    // Extract Altitude (2 bytes following Latitude)
+    const altitude = parseInt(data.subarray(34, 36).toString('hex'), 16);
+    // Extract Angle (2 bytes following Altitude)
+    const angle = parseInt(data.subarray(36, 38).toString('hex'), 16);
+    // Extract Satellites (1 byte following Angle)
+    const satellites = parseInt(data.subarray(38, 39).toString('hex'), 16);
+    // Extract Speed (2 bytes following Satellites)
+    const speed = parseInt(data.subarray(39, 41).toString('hex'), 16);
 
     const gpsData = { latitude, longitude, altitude, angle, satellites, speed };
 
@@ -67,32 +77,19 @@ export class Codec8EParser {
       BLESensorData | BLEBeaconData | BLEAssetData | string
     > = {};
 
-    const ioElementCount = data.readUInt8(24);
-    let offset = 25;
-
+    const ioElementCount = parseInt(data.subarray(41, 42).toString('hex'), 16);
+    let offset = 42;
     for (let i = 0; i < ioElementCount; i++) {
-      if (offset + 2 >= data.length) {
-        Logger.warn(
-          `Incomplete IO element at offset ${offset}. Skipping remaining elements.`
-        );
-        break;
-      }
-
-      const ioId = data.readUInt8(offset);
-      const ioValueLength = data.readUInt8(offset + 1);
-      const ioValue = data.subarray(offset + 2, offset + 2 + ioValueLength);
-
-      if (ioId === 200 || ioId === 201 || ioId === 202) {
-        const parsedBLEData = this.parseBLEData(ioId, ioValue);
-        Logger.log(
-          `Parsed BLE Data for IO ID ${ioId}: ${JSON.stringify(parsedBLEData)}`
-        );
-        bleData[ioId.toString()] = parsedBLEData;
-      } else {
-        ioElements[ioId] = ioValue.toString('hex');
-      }
-
-      offset += 2 + ioValueLength;
+      const ioId = parseInt(
+        data.subarray(offset, offset + 1).toString('hex'),
+        16
+      );
+      const ioValue = parseInt(
+        data.subarray(offset + 1, offset + 2).toString('hex'),
+        16
+      );
+      ioElements[ioId] = ioValue;
+      offset += 2;
     }
 
     return {
