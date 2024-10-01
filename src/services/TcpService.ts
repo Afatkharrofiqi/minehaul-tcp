@@ -21,7 +21,8 @@ export class TcpService {
     );
 
     socket.on('data', async (data) => {
-      Logger.log(`Received raw data: ${data.toString('hex')}`);
+      Logger.log(`Received raw buffer data: ${data}`);
+      Logger.log(`Received raw buffer convert to hex: ${data.toString('hex')}`);
       Logger.log(`Data length: ${data.length} bytes`);
 
       try {

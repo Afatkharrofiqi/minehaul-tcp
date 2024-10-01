@@ -1,3 +1,5 @@
+import { Logger } from './Logger';
+
 export interface DecodedPacket {
   timestamp: Date;
   priority: number;
@@ -15,8 +17,8 @@ export interface DecodedPacket {
 
 export class Codec8EParser {
   public static parsePacket(data: Buffer): DecodedPacket {
-    console.log(`Received data length: ${data.length}`);
-    console.log(`Hex data: ${data.toString('hex')}`); // Log the raw data in hex format
+    Logger.log(`Received data length: ${data.length}`);
+    Logger.log(`Hex data: ${data.toString('hex')}`); // Log the raw data in hex format
 
     // Check if the packet is too short for a full Codec 8 Extended packet
     if (data.length < 25) {
