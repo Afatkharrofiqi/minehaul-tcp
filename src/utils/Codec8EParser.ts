@@ -45,10 +45,15 @@ export class Codec8EParser {
         rawData: data.toString('hex'),
       };
     }
-    // Extract the Timestamp (8 bytes after the IMEI)
-    const timestamp = new Date(
-      parseInt(data.subarray(17, 25).toString('hex'), 16)
-    );
+    // Correct timestamp extraction: 8 bytes after IMEI (milliseconds since Unix epoch)
+    const timestampBuffer = data.slice(17, 25);
+    const timestampMs = parseInt(timestampBuffer.toString('hex'), 16);
+    const timestamp = new Date(timestampMs); // Create a Date object from milliseconds
+
+    // Validate timestamp
+    if (isNaN(timestamp.getTime())) {
+      throw new Error(`Invalid timestamp value: ${timestampMs}`);
+    }
     // Extract Priority (1 byte following Timestamp)
     const priority = parseInt(data.subarray(25, 26).toString('hex'), 16);
     // Extract Longitude (4 bytes following Priority)
