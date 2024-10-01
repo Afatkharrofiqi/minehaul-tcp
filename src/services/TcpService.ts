@@ -8,25 +8,37 @@ import { SyncDeviceDataService } from './SyncDeviceDataService';
 
 // Function to parse the data
 function parseTeltonikaData(buffer: Buffer) {
+  // Check if buffer is not empty and has a minimum length
+  if (!buffer || buffer.length < 8) {
+    console.log(
+      'Invalid or empty buffer. Please provide a valid Teltonika data buffer.'
+    );
+    return;
+  }
+
+  // Log the buffer content for debugging
+  Logger.log(`Buffer Content: ${buffer}`);
+
   let offset = 0;
 
   // Preamble (4 bytes)
   const preamble = buffer.readUInt32BE(offset);
   offset += 4;
-  Logger.log(`Preamble: ${preamble}`);
+  console.log(`Preamble: ${preamble}`);
 
   // Data Size (2 bytes)
   const dataSize = buffer.readUInt16BE(offset);
   offset += 2;
-  Logger.log(`Datasize: ${dataSize}`);
+  console.log(`Data Size: ${dataSize}`);
 
   // Codec ID (1 byte)
   const codecId = buffer.readUInt8(offset);
   offset += 1;
-  Logger.log(`CodecID: ${codecId}`);
+  console.log(`Codec ID: ${codecId}`);
 
+  // Check if the Codec ID matches Codec 8 Extended (0x8e)
   if (codecId !== 0x8e) {
-    Logger.log('Unsupported codec. Expected Codec 8 Extended.');
+    console.log('Unsupported codec. Expected Codec 8 Extended.');
     return;
   }
 
