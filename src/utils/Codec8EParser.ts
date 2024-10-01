@@ -1,6 +1,5 @@
 import { Logger } from './Logger';
 
-// Define interfaces for BLE data
 export interface BLESensorData {
   temperature: number;
   humidity: number;
@@ -18,7 +17,6 @@ export interface BLEAssetData {
   assetType: number;
 }
 
-// Define the structure of the DecodedPacket interface
 export interface DecodedPacket {
   timestamp: Date;
   priority: number;
@@ -48,8 +46,8 @@ export class Codec8EParser {
       };
     }
 
-    const dataView = new DataView(data.buffer);
-    const timestamp = new Date(Number(dataView.getBigInt64(0)));
+    // Convert bigint to number safely
+    const timestamp = new Date(Number(data.readBigUInt64BE(0))); // Corrected timestamp extraction
     const priority = data.readUInt8(8);
     const latitude = data.readInt32BE(9) / 10000000;
     const longitude = data.readInt32BE(13) / 10000000;
@@ -57,6 +55,7 @@ export class Codec8EParser {
     const angle = data.readUInt16BE(19);
     const satellites = data.readUInt8(21);
     const speed = data.readUInt16BE(22);
+
     const gpsData = { latitude, longitude, altitude, angle, satellites, speed };
 
     const ioElements: Record<
@@ -72,7 +71,7 @@ export class Codec8EParser {
     let offset = 25;
 
     for (let i = 0; i < ioElementCount; i++) {
-      if (offset + 1 >= data.length) {
+      if (offset + 2 >= data.length) {
         Logger.warn(
           `Incomplete IO element at offset ${offset}. Skipping remaining elements.`
         );
@@ -115,7 +114,6 @@ export class Codec8EParser {
     );
 
     if (ioValue.length < 9) {
-      // Adjust this value based on the minimum required length for BLE data
       Logger.warn(
         `BLE data for IO ID ${ioId} is too short: ${ioValue.length} bytes`
       );
@@ -135,7 +133,6 @@ export class Codec8EParser {
   }
 
   private static parseBLESensorData(ioValue: Buffer): BLESensorData {
-    Logger.log(`Parsing BLE Sensor Data: ${ioValue.toString('hex')}`);
     return {
       temperature: ioValue.readInt8(0),
       humidity: ioValue.readInt8(1),
@@ -143,7 +140,6 @@ export class Codec8EParser {
   }
 
   private static parseBLEBeaconData(ioValue: Buffer): BLEBeaconData {
-    Logger.log(`Parsing BLE Beacon Data: ${ioValue.toString('hex')}`);
     return {
       uuid: ioValue.subarray(0, 16).toString('hex'),
       major: ioValue.readUInt16BE(16),
@@ -153,7 +149,6 @@ export class Codec8EParser {
   }
 
   private static parseBLEAssetData(ioValue: Buffer): BLEAssetData {
-    Logger.log(`Parsing BLE Asset Data: ${ioValue.toString('hex')}`);
     return {
       assetId: ioValue.subarray(0, 8).toString('hex'),
       assetType: ioValue.readUInt8(8),

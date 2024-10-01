@@ -7,11 +7,10 @@ import { SyncDeviceDataService } from './SyncDeviceDataService';
 
 export class TcpService {
   private server: Server;
-  private syncServiceData: SyncDeviceDataService;
 
-  constructor(syncServiceData: SyncDeviceDataService) {
+  constructor(private syncServiceData: SyncDeviceDataService) {
+    // Create a TCP server and bind the `handleConnection` method as the connection handler
     this.server = new Server(this.handleConnection.bind(this));
-    this.syncServiceData = syncServiceData;
   }
 
   private async handleConnection(socket: Socket): Promise<void> {
@@ -23,22 +22,19 @@ export class TcpService {
       Logger.log(`Data length: ${data.length} bytes`);
 
       try {
-        // Check if it's the initial IMEI packet
+        // Handle initial IMEI packet (17 bytes long)
         if (data.length === 17) {
-          // Extract IMEI from the first packet (skip 2 bytes and read 15 ASCII characters)
           const imei = data.subarray(2).toString('ascii');
           Logger.log(`Received IMEI: ${imei}`);
-
-          // Respond to the client acknowledging the IMEI
-          socket.write(Buffer.from([0x01])); // Acknowledge the IMEI
-
-          return; // Stop further processing as this is only IMEI acknowledgment
+          // Acknowledge IMEI reception
+          socket.write(Buffer.from([0x01]));
+          return;
         }
 
-        // Parse the incoming data using Codec 8E parser
+        // Decode the incoming data using Codec8E parser
         const decodedData: DecodedPacket = Codec8EParser.parsePacket(data);
 
-        // Check if packet is partially parsed or has only raw data
+        // Check if parsed data contains GPS data and IO elements
         if (!decodedData.gpsData || !decodedData.ioElements) {
           Logger.warn(
             `Received an incomplete or unrecognized packet: ${decodedData.rawData}`
@@ -47,11 +43,11 @@ export class TcpService {
           return;
         }
 
-        // Save parsed data into the database
+        // Save parsed data to the database
         await this.syncServiceData.insert(decodedData);
 
-        // Respond to the client
-        socket.write(`Data logged successfully.`);
+        // Acknowledge successful data logging
+        socket.write(Buffer.from([0x01])); // Send acknowledgement byte (for example)
         Logger.log('Data logged successfully.');
       } catch (error) {
         socket.write(`Failed to log data.`);
@@ -64,7 +60,7 @@ export class TcpService {
     });
 
     socket.on('error', (err) => {
-      Logger.error(`Socket error: ${err}`);
+      Logger.error(`Socket error: ${err.message}`);
     });
   }
 
