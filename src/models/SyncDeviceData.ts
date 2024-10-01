@@ -11,10 +11,10 @@ export class SyncDeviceData {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'timestamp', nullable: true })
   timestamp!: Date;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'int', nullable: true })
   priority!: number;
 
   @Column({ type: 'float', nullable: true })
