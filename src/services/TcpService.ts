@@ -2,12 +2,15 @@
 import { Server, Socket } from 'net';
 
 import { TcpConfig } from '../configs/TcpConfig';
+import { LogService } from './LogService';
 
 export class TcpService {
   private server: Server;
+  private logService: LogService;
 
-  constructor() {
+  constructor(logService: LogService) {
     this.server = new Server(this.handleConnection.bind(this));
+    this.logService = logService;
   }
 
   private handleConnection(socket: Socket): void {
@@ -16,10 +19,20 @@ export class TcpService {
     );
 
     // Listen for data from the client
-    socket.on('data', (data) => {
+    socket.on('data', async (data) => {
       console.log(`Received data: ${data}`);
-      // Echo back the data
-      socket.write(`Echo: ${data}`);
+
+      // Save the data to logs using LogService
+      try {
+        const cleanString = data.toString().replace(/\r\n/g, '');
+        await this.logService.logTcpData(cleanString);
+        // Echo back the data
+        socket.write(`Data logged successfully: ${cleanString}`);
+        console.log('Data logged successfully.');
+      } catch (error) {
+        socket.write(`Failed to log data.`);
+        console.error('Failed to log data:', error);
+      }
     });
 
     // Handle client disconnection
