@@ -6,25 +6,13 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity('logs')
-export class Log {
+@Entity('sync_device_data')
+export class SyncDeviceData {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'varchar' })
-  method!: string;
-
-  @Column({ type: 'varchar' })
-  url!: string;
-
-  @Column({ type: 'json', nullable: true })
-  request_headers?: object;
-
-  @Column({ type: 'json', nullable: true })
-  request_body?: object;
-
-  @Column({ type: 'json', nullable: true })
-  response?: object;
+  @Column({ type: 'text', nullable: true })
+  data!: string;
 
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
