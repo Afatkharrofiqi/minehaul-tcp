@@ -20,15 +20,13 @@ export class TcpService {
     );
 
     socket.on('data', async (data) => {
-      Logger.log(`Received raw buffer data: ${data}`);
-      Logger.log(`Received raw buffer convert to hex: ${data.toString('hex')}`);
       Logger.log(`Data length: ${data.length} bytes`);
 
       try {
         // Check if it's the initial IMEI packet
         if (data.length === 17) {
           // Extract IMEI from the first packet (skip 2 bytes and read 15 ASCII characters)
-          const imei = data.slice(2).toString('ascii');
+          const imei = Buffer.from(data, 2).toString('ascii');
           Logger.log(`Received IMEI: ${imei}`);
 
           // Respond to the client acknowledging the IMEI

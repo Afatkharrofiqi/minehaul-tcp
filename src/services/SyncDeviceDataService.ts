@@ -15,6 +15,8 @@ export class SyncDeviceDataService {
     Logger.log(
       `Inserting data into the database: ${JSON.stringify(decodedData)}`
     );
+
+    // Create a new SyncDeviceData entity instance with the decoded data
     const syncDeviceData = this.repo.create({
       timestamp: decodedData.timestamp,
       priority: decodedData.priority,
@@ -25,8 +27,11 @@ export class SyncDeviceDataService {
       satellites: decodedData.gpsData?.satellites,
       speed: decodedData.gpsData?.speed,
       io_elements: decodedData.ioElements, // Save IO elements as a JSON object
+      ble_data: decodedData.bleData, // Save BLE data as a JSON object
+      raw_data: decodedData.rawData, // Save raw data as text
     });
 
+    // Save the data in the database
     const savedData = await this.repo.save(syncDeviceData);
     Logger.log(`Data successfully saved with ID: ${savedData.id}`);
     return savedData;

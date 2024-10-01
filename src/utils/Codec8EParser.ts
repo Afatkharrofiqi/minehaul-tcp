@@ -1,5 +1,24 @@
 import { Logger } from './Logger';
 
+// Define interfaces for BLE data
+export interface BLESensorData {
+  temperature: number;
+  humidity: number;
+}
+
+export interface BLEBeaconData {
+  uuid: string;
+  major: number;
+  minor: number;
+  rssi: number;
+}
+
+export interface BLEAssetData {
+  assetId: string;
+  assetType: number;
+}
+
+// Define the structure of the DecodedPacket interface
 export interface DecodedPacket {
   timestamp: Date;
   priority: number;
@@ -11,7 +30,11 @@ export interface DecodedPacket {
     satellites: number;
     speed: number;
   };
-  ioElements?: Record<number, number>;
+  ioElements?: Record<number, number | string | Record<string, unknown>>;
+  bleData?: Record<
+    string,
+    BLESensorData | BLEBeaconData | BLEAssetData | string
+  >;
   rawData: string;
 }
 
@@ -47,21 +70,37 @@ export class Codec8EParser {
     const gpsData = { latitude, longitude, altitude, angle, satellites, speed };
 
     // Parse IO Elements (replace with correct offset and structure parsing)
-    const ioElements: Record<number, number> = {};
+    const ioElements: Record<
+      number,
+      number | string | Record<string, unknown>
+    > = {};
+    const bleData: Record<
+      string,
+      BLESensorData | BLEBeaconData | BLEAssetData | string
+    > = {}; // Store parsed BLE data separately
+
     const ioElementCount = data.readUInt8(24); // Number of IO elements
     let offset = 25; // Starting position of IO elements
 
     for (let i = 0; i < ioElementCount; i++) {
       if (offset + 1 >= data.length) {
-        console.warn(
+        Logger.warn(
           `Incomplete IO element at offset ${offset}. Skipping remaining elements.`
         );
         break;
       }
       const ioId = data.readUInt8(offset); // 1 byte for IO ID
-      const ioValue = data.readUInt8(offset + 1); // 1 byte for IO value (assuming 1 byte values)
-      ioElements[ioId] = ioValue;
-      offset += 2; // Move to next IO element
+      const ioValueLength = data.readUInt8(offset + 1); // Length of the IO value
+      const ioValue = data.slice(offset + 2, offset + 2 + ioValueLength); // Extract value
+
+      // Special handling for BLE data based on specific IO IDs
+      if (ioId === 200 || ioId === 201 || ioId === 202) {
+        bleData[ioId.toString()] = this.parseBLEData(ioId, ioValue);
+      } else {
+        ioElements[ioId] = ioValue.toString('hex'); // Default to hex string for other IO IDs
+      }
+
+      offset += 2 + ioValueLength; // Move to next IO element
     }
 
     return {
@@ -69,7 +108,52 @@ export class Codec8EParser {
       priority,
       gpsData,
       ioElements,
+      bleData,
       rawData: data.toString('hex'),
+    };
+  }
+
+  private static parseBLEData(
+    ioId: number,
+    ioValue: Buffer
+  ): BLESensorData | BLEBeaconData | BLEAssetData | string {
+    // Implement specific parsing logic for BLE data based on IO ID
+    switch (ioId) {
+      case 200:
+        return this.parseBLESensorData(ioValue);
+      case 201:
+        return this.parseBLEBeaconData(ioValue);
+      case 202:
+        return this.parseBLEAssetData(ioValue);
+      default:
+        return `Unknown BLE data for IO ID ${ioId}`;
+    }
+  }
+
+  private static parseBLESensorData(ioValue: Buffer): BLESensorData {
+    // Parse BLE sensor data (example: temperature, humidity, etc.)
+    // The structure will vary based on the Teltonika protocol specification
+    return {
+      temperature: ioValue.readInt8(0), // Assume first byte is temperature
+      humidity: ioValue.readInt8(1), // Assume second byte is humidity
+    };
+  }
+
+  private static parseBLEBeaconData(ioValue: Buffer): BLEBeaconData {
+    // Parse BLE beacon data (example: UUID, major, minor, RSSI, etc.)
+    return {
+      uuid: ioValue.slice(0, 16).toString('hex'), // 16 bytes for UUID
+      major: ioValue.readUInt16BE(16), // 2 bytes for major value
+      minor: ioValue.readUInt16BE(18), // 2 bytes for minor value
+      rssi: ioValue.readInt8(20), // 1 byte for RSSI
+    };
+  }
+
+  private static parseBLEAssetData(ioValue: Buffer): BLEAssetData {
+    // Parse BLE asset data (example: asset ID, type, etc.)
+    return {
+      assetId: ioValue.slice(0, 8).toString('hex'), // First 8 bytes for asset ID
+      assetType: ioValue.readUInt8(8), // 1 byte for asset type
     };
   }
 }
