@@ -8,7 +8,7 @@ import { SyncDeviceDataService } from './SyncDeviceDataService';
 
 // Function to parse the data
 function parseTeltonikaData(buffer: Buffer) {
-  // Check if buffer is not empty and has a minimum length
+  // Check if buffer is not empty and has a minimum length of 8 bytes (for initial fields)
   if (!buffer || buffer.length < 8) {
     console.log(
       'Invalid or empty buffer. Please provide a valid Teltonika data buffer.'
@@ -16,8 +16,8 @@ function parseTeltonikaData(buffer: Buffer) {
     return;
   }
 
-  // Log the buffer content for debugging
-  Logger.log(`Buffer Content: ${buffer}`);
+  // Log the buffer content in hexadecimal format for easier inspection
+  Logger.log(`Buffer Content (Hex):', ${buffer.toString('hex')}`);
 
   let offset = 0;
 
