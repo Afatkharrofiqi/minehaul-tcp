@@ -1,5 +1,6 @@
 import { Logger } from './Logger';
 
+// Define interfaces for BLE data
 export interface BLESensorData {
   temperature: number;
   humidity: number;
@@ -17,6 +18,7 @@ export interface BLEAssetData {
   assetType: number;
 }
 
+// Define the structure of the DecodedPacket interface
 export interface DecodedPacket {
   timestamp: Date;
   priority: number;
@@ -45,48 +47,16 @@ export class Codec8EParser {
         rawData: data.toString('hex'),
       };
     }
-    // Extract IMEI (assuming it's located at bytes 2-17)
-    const imei = data.subarray(2, 17).toString();
-    Logger.log(`Decoded IMEI: ${imei}`);
 
-    // Correct timestamp extraction: 8 bytes after IMEI (milliseconds since Unix epoch)
-    const timestampBuffer = data.subarray(17, 25);
-
-    // Convert the 8-byte buffer to a BigInt and create a Date object from milliseconds
-    const timestampMs = BigInt(`0x${timestampBuffer.toString('hex')}`);
-
-    // Check if the timestamp value is within the valid range of JavaScript Dates
-    const maxJsDateMs = BigInt(Number.MAX_SAFE_INTEGER); // Max safe value for JavaScript Date (about 285,616 years)
-    if (timestampMs > maxJsDateMs) {
-      throw new Error(`Invalid timestamp value: ${timestampMs.toString()}`);
-    }
-
-    // Create a JavaScript Date object
-    const timestamp = new Date(Number(timestampMs));
-
-    // Validate timestamp
-    if (isNaN(timestamp.getTime())) {
-      throw new Error(
-        `Invalid timestamp value after conversion: ${timestampMs.toString()}`
-      );
-    }
-    // Extract Priority (1 byte following Timestamp)
-    const priority = parseInt(data.subarray(25, 26).toString('hex'), 16);
-    // Extract Longitude (4 bytes following Priority)
-    const longitude =
-      parseInt(data.subarray(26, 30).toString('hex'), 16) / 10000000;
-    // Extract Latitude (4 bytes following Longitude)
-    const latitude =
-      parseInt(data.subarray(30, 34).toString('hex'), 16) / 10000000;
-    // Extract Altitude (2 bytes following Latitude)
-    const altitude = parseInt(data.subarray(34, 36).toString('hex'), 16);
-    // Extract Angle (2 bytes following Altitude)
-    const angle = parseInt(data.subarray(36, 38).toString('hex'), 16);
-    // Extract Satellites (1 byte following Angle)
-    const satellites = parseInt(data.subarray(38, 39).toString('hex'), 16);
-    // Extract Speed (2 bytes following Satellites)
-    const speed = parseInt(data.subarray(39, 41).toString('hex'), 16);
-
+    const dataView = new DataView(data.buffer);
+    const timestamp = new Date(Number(dataView.getBigInt64(0)));
+    const priority = data.readUInt8(8);
+    const latitude = data.readInt32BE(9) / 10000000;
+    const longitude = data.readInt32BE(13) / 10000000;
+    const altitude = data.readInt16BE(17);
+    const angle = data.readUInt16BE(19);
+    const satellites = data.readUInt8(21);
+    const speed = data.readUInt16BE(22);
     const gpsData = { latitude, longitude, altitude, angle, satellites, speed };
 
     const ioElements: Record<
@@ -98,19 +68,32 @@ export class Codec8EParser {
       BLESensorData | BLEBeaconData | BLEAssetData | string
     > = {};
 
-    const ioElementCount = parseInt(data.subarray(41, 42).toString('hex'), 16);
-    let offset = 42;
+    const ioElementCount = data.readUInt8(24);
+    let offset = 25;
+
     for (let i = 0; i < ioElementCount; i++) {
-      const ioId = parseInt(
-        data.subarray(offset, offset + 1).toString('hex'),
-        16
-      );
-      const ioValue = parseInt(
-        data.subarray(offset + 1, offset + 2).toString('hex'),
-        16
-      );
-      ioElements[ioId] = ioValue;
-      offset += 2;
+      if (offset + 1 >= data.length) {
+        Logger.warn(
+          `Incomplete IO element at offset ${offset}. Skipping remaining elements.`
+        );
+        break;
+      }
+
+      const ioId = data.readUInt8(offset);
+      const ioValueLength = data.readUInt8(offset + 1);
+      const ioValue = data.subarray(offset + 2, offset + 2 + ioValueLength);
+
+      if (ioId === 200 || ioId === 201 || ioId === 202) {
+        const parsedBLEData = this.parseBLEData(ioId, ioValue);
+        Logger.log(
+          `Parsed BLE Data for IO ID ${ioId}: ${JSON.stringify(parsedBLEData)}`
+        );
+        bleData[ioId.toString()] = parsedBLEData;
+      } else {
+        ioElements[ioId] = ioValue.toString('hex');
+      }
+
+      offset += 2 + ioValueLength;
     }
 
     return {
@@ -132,6 +115,7 @@ export class Codec8EParser {
     );
 
     if (ioValue.length < 9) {
+      // Adjust this value based on the minimum required length for BLE data
       Logger.warn(
         `BLE data for IO ID ${ioId} is too short: ${ioValue.length} bytes`
       );
@@ -151,6 +135,7 @@ export class Codec8EParser {
   }
 
   private static parseBLESensorData(ioValue: Buffer): BLESensorData {
+    Logger.log(`Parsing BLE Sensor Data: ${ioValue.toString('hex')}`);
     return {
       temperature: ioValue.readInt8(0),
       humidity: ioValue.readInt8(1),
@@ -158,6 +143,7 @@ export class Codec8EParser {
   }
 
   private static parseBLEBeaconData(ioValue: Buffer): BLEBeaconData {
+    Logger.log(`Parsing BLE Beacon Data: ${ioValue.toString('hex')}`);
     return {
       uuid: ioValue.subarray(0, 16).toString('hex'),
       major: ioValue.readUInt16BE(16),
@@ -167,6 +153,7 @@ export class Codec8EParser {
   }
 
   private static parseBLEAssetData(ioValue: Buffer): BLEAssetData {
+    Logger.log(`Parsing BLE Asset Data: ${ioValue.toString('hex')}`);
     return {
       assetId: ioValue.subarray(0, 8).toString('hex'),
       assetType: ioValue.readUInt8(8),
