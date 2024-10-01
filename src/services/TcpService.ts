@@ -4,55 +4,54 @@ import { TcpConfig } from '../configs/TcpConfig';
 import { Logger } from '../utils/Logger';
 import { SyncDeviceDataService } from './SyncDeviceDataService';
 
-function decodeAvlData(buffer: Buffer) {
-  let index = 0;
-
-  // Timestamp (8 bytes, unsigned 64-bit)
-  const timestamp = buffer.readBigUInt64BE(index);
-  index += 8;
-
-  // Priority (1 byte, unsigned 8-bit)
-  const priority = buffer.readUInt8(index);
-  index += 1;
-
-  // GPS Data
-  const longitude = buffer.readInt32BE(index) / 10000000; // Longitude (4 bytes)
-  index += 4;
-  const latitude = buffer.readInt32BE(index) / 10000000; // Latitude (4 bytes)
-  index += 4;
-  const altitude = buffer.readInt16BE(index); // Altitude (2 bytes)
-  index += 2;
-  const angle = buffer.readUInt16BE(index); // Angle (2 bytes)
-  index += 2;
-  const satellites = buffer.readUInt8(index); // Satellites (1 byte)
-  index += 1;
-  const speed = buffer.readUInt16BE(index); // Speed (2 bytes)
-  index += 2;
-
-  // Displaying the decoded data
-  console.log('Timestamp:', timestamp);
-  console.log('Priority:', priority);
-  console.log('Longitude:', longitude);
-  console.log('Latitude:', latitude);
-  console.log('Altitude:', altitude);
-  console.log('Angle:', angle);
-  console.log('Satellites:', satellites);
-  console.log('Speed:', speed);
-
-  // AVL IO data and records should be decoded here as per Teltonika's protocol
-  // The decoding logic will depend on the device's protocol specification
-
-  return {
-    timestamp,
-    priority,
-    longitude,
-    latitude,
-    altitude,
-    angle,
-    satellites,
-    speed,
+interface Codec8ExtendedPacket {
+  codecId: number;
+  timestamp: number;
+  priority: number;
+  gps: {
+    longitude: number;
+    latitude: number;
+    altitude: number;
+    angle: number;
+    satellites: number;
+    speed: number;
+  };
+  ioElements: {
+    eventId: number;
+    totalIO: number;
+    ioData: { [key: number]: number };
   };
 }
+
+// Function to parse the received buffer data
+const parseCodec8Extended = (buffer: Buffer): Codec8ExtendedPacket => {
+  // Parse the buffer according to Codec 8 Extended specifications
+  const codecId = buffer.readUInt8(0);
+  const timestamp = buffer.readBigUInt64BE(1);
+  const priority = buffer.readUInt8(9);
+
+  // Example parsing, adjust according to actual packet structure
+  const gps = {
+    longitude: buffer.readInt32BE(10),
+    latitude: buffer.readInt32BE(14),
+    altitude: buffer.readInt16BE(18),
+    angle: buffer.readUInt16BE(20),
+    satellites: buffer.readUInt8(22),
+    speed: buffer.readUInt16BE(23),
+  };
+
+  const ioElements = {
+    eventId: buffer.readUInt8(25),
+    totalIO: buffer.readUInt8(26),
+    ioData: {
+      // Example IO data extraction
+      1: buffer.readUInt8(27),
+      2: buffer.readUInt8(28),
+    },
+  };
+
+  return { codecId, timestamp: Number(timestamp), priority, gps, ioElements };
+};
 
 export class TcpService {
   private server: Server;
@@ -109,40 +108,17 @@ export class TcpService {
     //   }
     // });
 
-    socket.once('data', (data) => {
-      // Step 1: Receive IMEI (15-byte string)
-      const imeiLength = 15;
-      const imei = data.slice(0, imeiLength).toString();
-      console.log(`Received IMEI: ${imei}`);
+    socket.on('data', (data) => {
+      console.log('Data received:', data);
 
-      // Step 2: Respond to IMEI confirmation (1-byte acknowledgment: 0x01)
-      socket.write(Buffer.from([0x01])); // Acknowledge the IMEI
+      // Parse the received data as a Codec 8 Extended packet
+      const packet = parseCodec8Extended(data);
 
-      // Step 3: Listen for AVL data packets
-      socket.on('data', (packet) => {
-        try {
-          // Read the first 4 bytes to get the length of the AVL data packet
-          if (packet.length >= 4) {
-            const packetLength = packet.readUInt32BE(0);
-            console.log(`AVL packet length: ${packetLength}`);
+      console.log('Parsed packet:', packet);
 
-            // Check if the packet has the correct length and parse the AVL data
-            if (packet.length >= 4 + packetLength) {
-              const avlData = packet.slice(4, 4 + packetLength);
-              decodeAvlData(avlData);
-
-              // Acknowledge the number of data records received
-              // For simplicity, assuming 1 record; adjust according to actual data
-              const numDataRecords = 1;
-              const acknowledgment = Buffer.alloc(4);
-              acknowledgment.writeUInt32BE(numDataRecords, 0);
-              socket.write(acknowledgment);
-            }
-          }
-        } catch (error) {
-          console.error('Error processing AVL data:', error);
-        }
-      });
+      // Send acknowledgment to client if needed
+      const response = Buffer.from([0x01]);
+      socket.write(response);
     });
 
     socket.on('end', () => {
