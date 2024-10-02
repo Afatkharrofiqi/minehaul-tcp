@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import crc from 'crc';
 import { Server, Socket } from 'net';
 
@@ -85,12 +86,12 @@ function parseTeltonikaData(buffer: Buffer) {
 
     // Parse IO elements (variable length)
     const prevOffset = offset;
-    offset = parseIoElementsExtended(buffer, offset, totalIoElements);
+    // offset = parseIoElementsExtended(buffer, offset, totalIoElements);
 
-    if (offset === -1) {
-      Logger.log(`Error parsing IO Elements for record ${i + 1}.`);
-      return;
-    }
+    // if (offset === -1) {
+    //   Logger.log(`Error parsing IO Elements for record ${i + 1}.`);
+    //   return;
+    // }
 
     // Log the bytes read and the new offset after parsing IO elements
     Logger.log(
