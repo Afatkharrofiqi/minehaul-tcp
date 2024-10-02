@@ -8,7 +8,6 @@ import { SyncDeviceDataService } from './SyncDeviceDataService';
 
 function parseTeltonikaData(buffer: Buffer) {
   if (!buffer || buffer.length < 15) {
-    // Minimum length: Preamble (4 bytes) + Data Field Length (4 bytes) + Codec ID (1 byte) + Number of Data 1 (1 byte) + CRC (4 bytes)
     Logger.log(
       'Invalid or empty buffer. Please provide a valid Teltonika data buffer.'
     );
@@ -73,7 +72,6 @@ function parseTeltonikaData(buffer: Buffer) {
       `GPS Data: Latitude: ${latitude}, Longitude: ${longitude}, Altitude: ${altitude}, Speed: ${speed}, Satellites: ${satellites}, Angle: ${angle}, Priority: ${priority}`
     );
 
-    // IO Element (variable length, based on IO data set configuration)
     // Event IO ID (2 bytes)
     const eventId = buffer.readUInt16BE(offset);
     offset += 2;
@@ -84,8 +82,13 @@ function parseTeltonikaData(buffer: Buffer) {
 
     Logger.log(`Event ID: ${eventId}, Total IO Elements: ${totalIoElements}`);
 
-    // Parse IO elements (length varies)
+    // Parse IO elements (variable length)
     offset = parseIoElementsExtended(buffer, offset, totalIoElements);
+
+    if (offset === -1) {
+      Logger.log(`Error parsing IO Elements for record ${i + 1}.`);
+      return;
+    }
   }
 
   // Read Number of Data 2 (1 byte, should match Number of Data 1)
@@ -115,7 +118,7 @@ function parseTeltonikaData(buffer: Buffer) {
   Logger.log(`CRC (From Buffer): ${crc16}`);
 
   // Calculate CRC for validation
-  const calculatedCrc16 = crc.crc16modbus(buffer.subarray(8, offset - 4)); // Calculate CRC for the data excluding preamble and CRC itself
+  const calculatedCrc16 = crc.crc16modbus(buffer.subarray(4, offset - 4)); // Calculate CRC for the data excluding preamble and CRC itself
   Logger.log(`Calculated CRC: ${calculatedCrc16}`);
 
   if (crc16 !== calculatedCrc16) {
@@ -128,7 +131,7 @@ function parseTeltonikaData(buffer: Buffer) {
   Logger.log('Data parsed successfully');
 }
 
-// Function to parse IO Elements for Codec 8 Extended
+// Updated Function to Parse IO Elements for Codec 8 Extended
 function parseIoElementsExtended(
   buffer: Buffer,
   offset: number,
@@ -137,22 +140,30 @@ function parseIoElementsExtended(
   Logger.log(`Parsing ${totalElements} IO Elements...`);
 
   for (let i = 0; i < totalElements; i++) {
+    // Ensure we have at least 2 bytes to read the IO ID
     if (buffer.length < offset + 2) {
-      Logger.log(`Insufficient buffer length for IO Element ${i + 1}.`);
-      return offset;
+      Logger.log(`Insufficient buffer length for IO Element ID at index ${i}.`);
+      return -1;
     }
 
     // Read IO ID (2 bytes)
     const ioId = buffer.readUInt16BE(offset);
     offset += 2;
 
-    // Read IO Value (variable length based on IO ID and element length configuration)
+    // Determine the length of the IO value based on the configuration
     const ioValueLength = getIoValueLength(ioId);
     if (buffer.length < offset + ioValueLength) {
       Logger.log(`Insufficient buffer length for IO Value of IO ID ${ioId}.`);
-      return offset;
+      return -1;
     }
-    const ioValue = buffer.readUIntBE(offset, ioValueLength);
+
+    // Read IO Value (variable length)
+    let ioValue;
+    if (ioValueLength > 0) {
+      ioValue = buffer.readUIntBE(offset, ioValueLength);
+    } else {
+      ioValue = buffer.readUInt8(offset);
+    }
     offset += ioValueLength;
 
     Logger.log(`IO Element ID: ${ioId}, Value: ${ioValue}`);
@@ -161,11 +172,13 @@ function parseIoElementsExtended(
   return offset;
 }
 
-// Helper function to determine IO element length based on ID (implementation depends on your configuration)
+// Helper function to determine IO element length based on ID (this is a simplified version, adjust as necessary)
 function getIoValueLength(ioId: number): number {
-  Logger.log(`${ioId}`);
-  // Example: Return 2 bytes for some specific IO IDs, adjust as needed
-  return 2;
+  // This should be defined based on the specific IO ID mappings and lengths in the Teltonika documentation
+  // For example:
+  if (ioId === 0) return 1; // Length of 1 byte for some IO elements
+  if (ioId === 1) return 2; // Length of 2 bytes for some IO elements
+  return 4; // Default length for other IO elements
 }
 
 export class TcpService {
