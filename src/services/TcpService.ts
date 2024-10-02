@@ -6,7 +6,6 @@ import { TcpConfig } from '../configs/TcpConfig';
 import { Logger } from '../utils/Logger';
 import { SyncDeviceDataService } from './SyncDeviceDataService';
 
-// Function to parse the data
 function parseTeltonikaData(buffer: Buffer) {
   if (!buffer || buffer.length < 11) {
     Logger.log(
@@ -16,7 +15,7 @@ function parseTeltonikaData(buffer: Buffer) {
   }
 
   // Log the buffer content in hexadecimal format for easier inspection
-  Logger.log(`Buffer Content (Hex):', ${buffer.toString('hex')}`);
+  Logger.log(`Buffer Content (Hex): ${buffer.toString('hex')}`);
 
   let offset = 0;
 
@@ -50,13 +49,17 @@ function parseTeltonikaData(buffer: Buffer) {
     Logger.log('Insufficient buffer length for Number of Data Records.');
     return;
   }
-  // Number of Data (1 byte)
   const numberOfRecords = buffer.readUInt8(offset);
   offset += 1;
   Logger.log(`Number of Data Records: ${numberOfRecords}`);
 
-  // Parse AVL Data Records
+  // Parse AVL Data Records if there are any
   for (let i = 0; i < numberOfRecords; i++) {
+    if (buffer.length < offset + 15) {
+      Logger.log(`Insufficient buffer length to parse record ${i + 1}.`);
+      return;
+    }
+
     // Timestamp (8 bytes)
     const timestamp = buffer.readBigUInt64BE(offset);
     offset += 8;
@@ -95,14 +98,34 @@ function parseTeltonikaData(buffer: Buffer) {
     }
   }
 
-  // Number of Data (1 byte, repeated)
+  // Number of Data Records (Repeated, 1 byte)
+  if (buffer.length < offset + 1) {
+    Logger.log('Insufficient buffer length for Repeat Number of Data Records.');
+    return;
+  }
   const repeatNumberOfData = buffer.readUInt8(offset);
-  Logger.log(`RepeatNumberofData: ${repeatNumberOfData}`);
+  Logger.log(`Repeat Number of Data Records: ${repeatNumberOfData}`);
   offset += 1;
 
+  // Validate the number of data records match
+  if (numberOfRecords !== repeatNumberOfData) {
+    Logger.log('Number of data records mismatch between start and end.');
+    return;
+  }
+
   // CRC-16 (2 bytes)
+  if (buffer.length < offset + 2) {
+    Logger.log('Insufficient buffer length for CRC.');
+    return;
+  }
   const crc16 = buffer.readUInt16BE(offset);
-  const calculatedCrc16 = crc.crc16modbus(buffer.subarray(4, offset)); // Calculate CRC for the data
+  offset += 2;
+  Logger.log(`CRC (From Buffer): ${crc16}`);
+
+  // Calculate CRC for validation
+  const calculatedCrc16 = crc.crc16modbus(buffer.subarray(8, offset - 2)); // Calculate CRC for the data excluding preamble and CRC itself
+  Logger.log(`Calculated CRC: ${calculatedCrc16}`);
+
   if (crc16 !== calculatedCrc16) {
     Logger.log(
       `CRC Error: Expected ${crc16}, but calculated ${calculatedCrc16}`
