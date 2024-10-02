@@ -10,7 +10,7 @@ import { SyncDeviceDataService } from './SyncDeviceDataService';
 function parseTeltonikaData(buffer: Buffer) {
   // Check if buffer is not empty and has a minimum length of 8 bytes (for initial fields)
   if (!buffer || buffer.length < 8) {
-    console.log(
+    Logger.log(
       'Invalid or empty buffer. Please provide a valid Teltonika data buffer.'
     );
     return;
@@ -21,24 +21,24 @@ function parseTeltonikaData(buffer: Buffer) {
 
   let offset = 0;
 
-  // Preamble (4 bytes)
-  const preamble = buffer.readUInt32BE(offset);
-  offset += 4;
-  console.log(`Preamble: ${preamble}`);
+  // Read Preamble (8 bytes)
+  const preamble = buffer.readBigUInt64BE(offset);
+  offset += 8;
+  Logger.log(`Preamble: 0x${preamble.toString(16)}`);
 
-  // Data Size (2 bytes)
+  // Read Data Size (2 bytes)
   const dataSize = buffer.readUInt16BE(offset);
   offset += 2;
-  console.log(`Data Size: ${dataSize}`);
+  Logger.log(`Data Size: 0x${dataSize.toString(16)}`);
 
-  // Codec ID (1 byte)
+  // Read Codec ID (1 byte)
   const codecId = buffer.readUInt8(offset);
   offset += 1;
-  console.log(`Codec ID: ${codecId}`);
+  Logger.log(`Codec ID: 0x${codecId.toString(16)}`);
 
   // Check if the Codec ID matches Codec 8 Extended (0x8e)
   if (codecId !== 0x8e) {
-    console.log('Unsupported codec. Expected Codec 8 Extended.');
+    Logger.log('Unsupported codec. Expected Codec 8 Extended.');
     return;
   }
 
