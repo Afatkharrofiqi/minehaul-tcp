@@ -16,7 +16,7 @@ function parseTeltonikaData(buffer: Buffer) {
   }
 
   // Log the buffer content in hexadecimal format for easier inspection
-  Logger.log('Buffer Content (Hex):', buffer.toString('hex'));
+  Logger.log(`Buffer Content (Hex):', ${buffer.toString('hex')}`);
 
   let offset = 0;
 
