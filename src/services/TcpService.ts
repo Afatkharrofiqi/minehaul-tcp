@@ -7,22 +7,25 @@ import { Logger } from '../utils/Logger';
 import { SyncDeviceDataService } from './SyncDeviceDataService';
 
 function parseTeltonikaData(buffer: Buffer) {
-  if (!buffer || buffer.length < 11) {
+  if (!buffer || buffer.length < 15) {
+    // Minimum length: Preamble (4 bytes) + Data Field Length (4 bytes) + Codec ID (1 byte) + Number of Data 1 (1 byte) + CRC (4 bytes)
     Logger.log(
       'Invalid or empty buffer. Please provide a valid Teltonika data buffer.'
     );
     return;
   }
 
-  // Log the buffer content in hexadecimal format for easier inspection
-  Logger.log(`Buffer Content (Hex): ${buffer.toString('hex')}`);
-
   let offset = 0;
 
-  // Read Preamble (8 bytes)
-  const preamble = buffer.readBigUInt64BE(offset);
-  offset += 8;
+  // Read Preamble (4 bytes)
+  const preamble = buffer.readUInt32BE(offset);
+  offset += 4;
   Logger.log(`Preamble: 0x${preamble.toString(16)}`);
+
+  // Read Data Field Length (4 bytes)
+  const dataFieldLength = buffer.readUInt32BE(offset);
+  offset += 4;
+  Logger.log(`Data Field Length: ${dataFieldLength}`);
 
   // Read Codec ID (1 byte)
   const codecId = buffer.readUInt8(offset);
@@ -35,38 +38,16 @@ function parseTeltonikaData(buffer: Buffer) {
     return;
   }
 
-  // Read Data Size (2 bytes)
-  if (buffer.length < offset + 2) {
-    Logger.log('Insufficient buffer length for Data Size.');
-    return;
-  }
-  const dataSize = buffer.readUInt16BE(offset);
-  offset += 2;
-  Logger.log(`Data Size: 0x${dataSize.toString(16)}`);
-  Logger.log(`Current Offset: ${offset}`);
-
-  // Read Number of Data Records (1 byte)
-  if (buffer.length < offset + 1) {
-    Logger.log('Insufficient buffer length for Number of Data Records.');
-    return;
-  }
-  const numberOfRecords = buffer.readUInt8(offset);
+  // Read Number of Data 1 (1 byte)
+  const numberOfData1 = buffer.readUInt8(offset);
   offset += 1;
-  Logger.log(`Number of Data Records: ${numberOfRecords}`);
-  Logger.log(`Current Offset after Number of Data Records: ${offset}`);
+  Logger.log(`Number of Data 1: ${numberOfData1}`);
 
-  // If Number of Data Records is zero, log and exit
-  if (numberOfRecords === 0) {
-    Logger.log(
-      'Number of Data Records is zero, which is unexpected given the data size.'
-    );
-    return;
-  }
-
-  // Parse AVL Data Records if there are any
-  for (let i = 0; i < numberOfRecords; i++) {
-    if (buffer.length < offset + 15) {
-      Logger.log(`Insufficient buffer length to parse record ${i + 1}.`);
+  // Parse AVL Data Records based on Number of Data 1
+  for (let i = 0; i < numberOfData1; i++) {
+    if (buffer.length < offset + 24) {
+      // Minimum length for one AVL record (Timestamp 8 bytes + Priority 1 byte + GPS Element 15 bytes)
+      Logger.log(`Insufficient buffer length to parse AVL record ${i + 1}.`);
       return;
     }
 
@@ -93,50 +74,48 @@ function parseTeltonikaData(buffer: Buffer) {
     );
 
     // IO Element (variable length, based on IO data set configuration)
-    const eventId = buffer.readUInt8(offset); // Event IO ID
-    const totalElements = buffer.readUInt8(offset + 1); // Total number of IO elements
+    // Event IO ID (2 bytes)
+    const eventId = buffer.readUInt16BE(offset);
     offset += 2;
 
-    Logger.log(`Event ID: ${eventId}, Total IO Elements: ${totalElements}`);
+    // Total Number of Properties (2 bytes)
+    const totalIoElements = buffer.readUInt16BE(offset);
+    offset += 2;
 
-    // Parse IO elements
-    offset = parseIoElements(buffer, offset, totalElements);
+    Logger.log(`Event ID: ${eventId}, Total IO Elements: ${totalIoElements}`);
 
-    // BLE Data (optional, parse if available based on configuration)
-    if (buffer.length > offset) {
-      offset = parseBleData(buffer, offset);
-    }
+    // Parse IO elements (length varies)
+    offset = parseIoElementsExtended(buffer, offset, totalIoElements);
   }
 
-  // Number of Data Records (Repeated, 1 byte)
+  // Read Number of Data 2 (1 byte, should match Number of Data 1)
   if (buffer.length < offset + 1) {
-    Logger.log('Insufficient buffer length for Repeat Number of Data Records.');
+    Logger.log('Insufficient buffer length for Number of Data 2.');
     return;
   }
-  const repeatNumberOfData = buffer.readUInt8(offset);
-  Logger.log(`Repeat Number of Data Records: ${repeatNumberOfData}`);
+  const numberOfData2 = buffer.readUInt8(offset);
   offset += 1;
-  Logger.log(`Current Offset after Repeat Number of Data Records: ${offset}`);
+  Logger.log(`Number of Data 2: ${numberOfData2}`);
 
-  // Validate the number of data records match
-  if (numberOfRecords !== repeatNumberOfData) {
+  // Validate that Number of Data 1 and Number of Data 2 match
+  if (numberOfData1 !== numberOfData2) {
     Logger.log(
-      `Number of data records mismatch between start (${numberOfRecords}) and end (${repeatNumberOfData}).`
+      `Number of data records mismatch between start (${numberOfData1}) and end (${numberOfData2}).`
     );
     return;
   }
 
-  // CRC-16 (2 bytes)
-  if (buffer.length < offset + 2) {
+  // CRC-16 (4 bytes)
+  if (buffer.length < offset + 4) {
     Logger.log('Insufficient buffer length for CRC.');
     return;
   }
-  const crc16 = buffer.readUInt16BE(offset);
-  offset += 2;
+  const crc16 = buffer.readUInt32BE(offset);
+  offset += 4;
   Logger.log(`CRC (From Buffer): ${crc16}`);
 
   // Calculate CRC for validation
-  const calculatedCrc16 = crc.crc16modbus(buffer.subarray(8, offset - 2)); // Calculate CRC for the data excluding preamble and CRC itself
+  const calculatedCrc16 = crc.crc16modbus(buffer.subarray(8, offset - 4)); // Calculate CRC for the data excluding preamble and CRC itself
   Logger.log(`Calculated CRC: ${calculatedCrc16}`);
 
   if (crc16 !== calculatedCrc16) {
@@ -149,25 +128,44 @@ function parseTeltonikaData(buffer: Buffer) {
   Logger.log('Data parsed successfully');
 }
 
-// Function to parse IO elements
-function parseIoElements(
+// Function to parse IO Elements for Codec 8 Extended
+function parseIoElementsExtended(
   buffer: Buffer,
   offset: number,
   totalElements: number
 ) {
+  Logger.log(`Parsing ${totalElements} IO Elements...`);
+
   for (let i = 0; i < totalElements; i++) {
-    // IO elements could be of different sizes: 1 byte, 2 bytes, 4 bytes, 8 bytes, etc.
-    // Implement IO parsing logic here based on your specific IO setup
-    // For simplicity, skipping IO parsing in this example
+    if (buffer.length < offset + 2) {
+      Logger.log(`Insufficient buffer length for IO Element ${i + 1}.`);
+      return offset;
+    }
+
+    // Read IO ID (2 bytes)
+    const ioId = buffer.readUInt16BE(offset);
+    offset += 2;
+
+    // Read IO Value (variable length based on IO ID and element length configuration)
+    const ioValueLength = getIoValueLength(ioId);
+    if (buffer.length < offset + ioValueLength) {
+      Logger.log(`Insufficient buffer length for IO Value of IO ID ${ioId}.`);
+      return offset;
+    }
+    const ioValue = buffer.readUIntBE(offset, ioValueLength);
+    offset += ioValueLength;
+
+    Logger.log(`IO Element ID: ${ioId}, Value: ${ioValue}`);
   }
+
   return offset;
 }
 
-// Function to parse BLE data (if present)
-function parseBleData(buffer: Buffer, offset: number) {
-  // Implement BLE parsing logic based on Teltonika's protocol documentation
-  // Typically includes beacon UUID, RSSI, and other sensor data
-  return offset;
+// Helper function to determine IO element length based on ID (implementation depends on your configuration)
+function getIoValueLength(ioId: number): number {
+  Logger.log(`${ioId}`);
+  // Example: Return 2 bytes for some specific IO IDs, adjust as needed
+  return 2;
 }
 
 export class TcpService {
