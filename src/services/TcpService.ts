@@ -8,8 +8,7 @@ import { SyncDeviceDataService } from './SyncDeviceDataService';
 
 // Function to parse the data
 function parseTeltonikaData(buffer: Buffer) {
-  // Check if buffer is not empty and has a minimum length of 8 bytes (for initial fields)
-  if (!buffer || buffer.length < 8) {
+  if (!buffer || buffer.length < 11) {
     Logger.log(
       'Invalid or empty buffer. Please provide a valid Teltonika data buffer.'
     );
@@ -17,7 +16,7 @@ function parseTeltonikaData(buffer: Buffer) {
   }
 
   // Log the buffer content in hexadecimal format for easier inspection
-  Logger.log(`Buffer Content (Hex):', ${buffer.toString('hex')}`);
+  Logger.log('Buffer Content (Hex):', buffer.toString('hex'));
 
   let offset = 0;
 
@@ -25,11 +24,6 @@ function parseTeltonikaData(buffer: Buffer) {
   const preamble = buffer.readBigUInt64BE(offset);
   offset += 8;
   Logger.log(`Preamble: 0x${preamble.toString(16)}`);
-
-  // Read Data Size (2 bytes)
-  const dataSize = buffer.readUInt16BE(offset);
-  offset += 2;
-  Logger.log(`Data Size: 0x${dataSize.toString(16)}`);
 
   // Read Codec ID (1 byte)
   const codecId = buffer.readUInt8(offset);
@@ -42,14 +36,27 @@ function parseTeltonikaData(buffer: Buffer) {
     return;
   }
 
-  // Number of Data (1 byte)
-  const numberOfData = buffer.readUInt8(offset);
-  offset += 1;
+  // Read Data Size (2 bytes)
+  if (buffer.length < offset + 2) {
+    Logger.log('Insufficient buffer length for Data Size.');
+    return;
+  }
+  const dataSize = buffer.readUInt16BE(offset);
+  offset += 2;
+  Logger.log(`Data Size: 0x${dataSize.toString(16)}`);
 
-  Logger.log(`Number of Data Records: ${numberOfData}`);
+  // Number of Data Records (1 byte)
+  if (buffer.length < offset + 1) {
+    Logger.log('Insufficient buffer length for Number of Data Records.');
+    return;
+  }
+  // Number of Data (1 byte)
+  const numberOfRecords = buffer.readUInt8(offset);
+  offset += 1;
+  Logger.log(`Number of Data Records: ${numberOfRecords}`);
 
   // Parse AVL Data Records
-  for (let i = 0; i < numberOfData; i++) {
+  for (let i = 0; i < numberOfRecords; i++) {
     // Timestamp (8 bytes)
     const timestamp = buffer.readBigUInt64BE(offset);
     offset += 8;
