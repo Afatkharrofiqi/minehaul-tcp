@@ -53,7 +53,8 @@ function parseTeltonikaData(buffer: Buffer) {
     // Timestamp (8 bytes)
     const timestamp = buffer.readBigUInt64BE(offset);
     offset += 8;
-    Logger.log(`Timestamp: ${new Date(Number(timestamp))}`);
+    const date = new Date(Number(timestamp));
+    Logger.log(`Timestamp: ${isNaN(date.getTime()) ? 'Invalid Date' : date}`);
 
     // Priority (1 byte)
     const priority = buffer.readUInt8(offset);
@@ -175,7 +176,6 @@ function parseIoElementsExtended(
 // Helper function to determine IO element length based on ID (this is a simplified version, adjust as necessary)
 function getIoValueLength(ioId: number): number {
   // This should be defined based on the specific IO ID mappings and lengths in the Teltonika documentation
-  // For example:
   if (ioId === 0) return 1; // Length of 1 byte for some IO elements
   if (ioId === 1) return 2; // Length of 2 bytes for some IO elements
   return 4; // Default length for other IO elements
