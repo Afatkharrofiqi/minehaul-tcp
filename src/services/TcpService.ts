@@ -45,11 +45,13 @@ function parseTeltonikaData(buffer: Buffer) {
 
   // Parse AVL Data Records based on Number of Data 1
   for (let i = 0; i < numberOfData1; i++) {
+    const no = i + 1;
     if (buffer.length < offset + 24) {
       // Minimum length for one AVL record (Timestamp 8 bytes + Priority 1 byte + GPS Element 15 bytes)
       Logger.log(`Insufficient buffer length to parse AVL record ${i + 1}.`);
       return;
     }
+    Logger.log(`--- Data: ${no}`);
 
     // Timestamp (8 bytes)
     const timestamp = buffer.readBigUInt64BE(offset);
