@@ -43,8 +43,9 @@ function parseTeltonikaData(buffer: Buffer) {
   const dataSize = buffer.readUInt16BE(offset);
   offset += 2;
   Logger.log(`Data Size: 0x${dataSize.toString(16)}`);
+  Logger.log(`Current Offset: ${offset}`);
 
-  // Number of Data Records (1 byte)
+  // Read Number of Data Records (1 byte)
   if (buffer.length < offset + 1) {
     Logger.log('Insufficient buffer length for Number of Data Records.');
     return;
@@ -52,6 +53,15 @@ function parseTeltonikaData(buffer: Buffer) {
   const numberOfRecords = buffer.readUInt8(offset);
   offset += 1;
   Logger.log(`Number of Data Records: ${numberOfRecords}`);
+  Logger.log(`Current Offset after Number of Data Records: ${offset}`);
+
+  // If Number of Data Records is zero, log and exit
+  if (numberOfRecords === 0) {
+    Logger.log(
+      'Number of Data Records is zero, which is unexpected given the data size.'
+    );
+    return;
+  }
 
   // Parse AVL Data Records if there are any
   for (let i = 0; i < numberOfRecords; i++) {
@@ -106,10 +116,13 @@ function parseTeltonikaData(buffer: Buffer) {
   const repeatNumberOfData = buffer.readUInt8(offset);
   Logger.log(`Repeat Number of Data Records: ${repeatNumberOfData}`);
   offset += 1;
+  Logger.log(`Current Offset after Repeat Number of Data Records: ${offset}`);
 
   // Validate the number of data records match
   if (numberOfRecords !== repeatNumberOfData) {
-    Logger.log('Number of data records mismatch between start and end.');
+    Logger.log(
+      `Number of data records mismatch between start (${numberOfRecords}) and end (${repeatNumberOfData}).`
+    );
     return;
   }
 
