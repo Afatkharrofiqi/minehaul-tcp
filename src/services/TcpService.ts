@@ -84,12 +84,18 @@ function parseTeltonikaData(buffer: Buffer) {
     Logger.log(`Event ID: ${eventId}, Total IO Elements: ${totalIoElements}`);
 
     // Parse IO elements (variable length)
+    const prevOffset = offset;
     offset = parseIoElementsExtended(buffer, offset, totalIoElements);
 
     if (offset === -1) {
       Logger.log(`Error parsing IO Elements for record ${i + 1}.`);
       return;
     }
+
+    // Log the bytes read and the new offset after parsing IO elements
+    Logger.log(
+      `Bytes read for IO Elements: ${offset - prevOffset}, New Offset: ${offset}`
+    );
   }
 
   // Read Number of Data 2 (1 byte, should match Number of Data 1)
@@ -153,8 +159,14 @@ function parseIoElementsExtended(
 
     // Determine the length of the IO value based on the configuration
     const ioValueLength = getIoValueLength(ioId);
+    Logger.log(
+      `Current Offset: ${offset}, IO ID: ${ioId}, Expected IO Value Length: ${ioValueLength}`
+    );
+
     if (buffer.length < offset + ioValueLength) {
-      Logger.log(`Insufficient buffer length for IO Value of IO ID ${ioId}.`);
+      Logger.log(
+        `Insufficient buffer length for IO Value of IO ID ${ioId}. Expected Length: ${ioValueLength}, Available Length: ${buffer.length - offset}`
+      );
       return -1;
     }
 
@@ -176,8 +188,8 @@ function parseIoElementsExtended(
 // Helper function to determine IO element length based on ID (this is a simplified version, adjust as necessary)
 function getIoValueLength(ioId: number): number {
   // This should be defined based on the specific IO ID mappings and lengths in the Teltonika documentation
-  if (ioId === 0) return 1; // Length of 1 byte for some IO elements
-  if (ioId === 1) return 2; // Length of 2 bytes for some IO elements
+  if (ioId >= 0 && ioId <= 255) return 1; // Length of 1 byte for IO IDs 0-255
+  if (ioId >= 256 && ioId <= 65535) return 2; // Length of 2 bytes for IO IDs 256-65535
   return 4; // Default length for other IO elements
 }
 
