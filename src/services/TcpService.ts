@@ -24,7 +24,7 @@ export class TcpService {
       `Client connected: ${socket.remoteAddress}:${socket.remotePort}`
     );
 
-    let imei = '';
+    let imeiHex = '';
 
     socket.on('data', async (data) => {
       Logger.log(`Received raw data: ${data.toString('hex')}`);
@@ -35,7 +35,8 @@ export class TcpService {
         const isImeiPacket = this.isImeiPacket(data);
 
         if (isImeiPacket) {
-          imei = this.extractImei(data);
+          imeiHex = data.toString('hex');
+          const imei = this.extractImei(data);
           Logger.log(`Received IMEI: ${imei}`);
           this.dataCodec.insert(data.toString('hex'));
 
@@ -44,7 +45,7 @@ export class TcpService {
           return;
         }
 
-        this.dataCodec.update(imei, data.toString('hex'));
+        this.dataCodec.update(imeiHex, data.toString('hex'));
 
         // Parse the incoming data using Codec 8E parser
         // const decodedData: DecodedPacket = Codec8EParser.parsePacket(data);
