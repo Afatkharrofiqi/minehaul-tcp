@@ -50,7 +50,7 @@ function parseTeltonikaData(buffer: Buffer) {
       Logger.log(`Insufficient buffer length to parse AVL record ${i + 1}.`);
       return;
     }
-    Logger.log(`--- Data: ${no}`);
+    Logger.log(`--- Data: ${no}: OFFSET: ${offset}`);
 
     // Timestamp (8 bytes)
     const timestamp = buffer.readBigUInt64BE(offset);
