@@ -14,18 +14,12 @@ export class DataCodecService {
     Logger.log(`Inserting data into the database with IMEI: ${imei}`);
 
     try {
-      // Check if a record with the same IMEI already exists to prevent duplicates
-      const existingRecord = await this.repo.findOne({ where: { imei } });
-      if (existingRecord) {
-        Logger.warn(`Record with IMEI: ${imei} already exists.`);
-        throw new Error(`Record with IMEI: ${imei} already exists.`);
-      }
-
       // Create a new SyncDeviceData entity instance with the provided IMEI
       const dataCodec = this.repo.create({ imei });
 
       // Save the new entity instance in the database
       const savedData = await this.repo.save(dataCodec);
+      Logger.log(`Data successfully saved with id: ${savedData.id}`);
       return savedData.id;
     } catch (error) {
       Logger.error(`Failed to insert data into the database. Error: ${error}`);
