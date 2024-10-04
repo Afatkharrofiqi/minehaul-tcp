@@ -1,6 +1,7 @@
 import { Server, Socket } from 'net';
 
 import { TcpConfig } from '../configs/TcpConfig';
+// import { Codec8EParser, DecodedPacket } from '../utils/Codec8EParser';
 import { Logger } from '../utils/Logger';
 import { SyncDeviceDataService } from './SyncDeviceDataService';
 
@@ -148,6 +149,7 @@ export class TcpService {
   private server: Server;
 
   constructor(private syncServiceData: SyncDeviceDataService) {
+    // Create a TCP server and bind the `handleConnection` method as the connection handler
     this.server = new Server(this.handleConnection.bind(this));
   }
 
@@ -159,56 +161,45 @@ export class TcpService {
     let dataBuffer: Buffer = Buffer.alloc(0);
 
     socket.on('data', async (data) => {
-      Logger.log(`Received data: ${data.toString('hex')}`);
+      Logger.log(`Data length: ${data.length} bytes`);
 
       // Append incoming data to buffer
       dataBuffer = Buffer.concat([dataBuffer, data]);
 
       try {
-        // Check if the data received is for IMEI verification
-        if (dataBuffer.length >= 19) {
-          // 4 bytes (prefix) + 15 bytes (IMEI) = 19 bytes
-          const imeiHex = dataBuffer.slice(4, 19).toString('hex'); // Extract only the IMEI hex part
-          Logger.log(`Received IMEI Hex: ${imeiHex}`);
-
-          // Convert hexadecimal ASCII values to string
-          let imei = '';
-          for (let i = 0; i < imeiHex.length; i += 2) {
-            imei += String.fromCharCode(parseInt(imeiHex.substr(i, 2), 16));
-          }
-
-          imei = imei.trim(); // Ensure no extra spaces
-          Logger.log(`Received IMEI: ${imei} (Length: ${imei.length})`);
-
-          // Check if IMEI is valid (15 digits)
-          if (/^\d{15}$/.test(imei) && imei.length === 15) {
-            const imeiAck = Buffer.from('01', 'hex');
-            socket.write(imeiAck);
-            Logger.log('IMEI verified successfully');
-
-            // Remove IMEI data from the buffer after verification
-            dataBuffer = dataBuffer.slice(19);
-          } else {
-            Logger.log('Invalid IMEI received');
-            socket.end();
-          }
-        } else if (dataBuffer.length > 19) {
-          // Handle AVL data once IMEI is verified
-          const hexStream = dataBuffer.toString('hex');
-          const parsedData = parseAvlData(hexStream);
-
-          Logger.log(`Parsed Data: ${JSON.stringify(parsedData)}`);
-
-          // Send acknowledgment after complete data reception
-          const receptionAck = Buffer.from('00000001', 'hex');
-          socket.write(receptionAck);
-          Logger.log('Data reception acknowledged');
-
-          // Clear buffer after processing
-          dataBuffer = Buffer.alloc(0);
+        // Handle initial IMEI packet (17 bytes long)
+        if (dataBuffer.length === 17) {
+          const imei = data.subarray(2).toString('ascii');
+          Logger.log(`Received IMEI: ${imei}`);
+          // Acknowledge IMEI reception
+          socket.write(Buffer.from([0x01]));
+          return;
         }
+
+        const hexStream = dataBuffer.toString('hex');
+        parseAvlData(hexStream);
+
+        // Decode the incoming data using Codec8E parser
+        // const decodedData: DecodedPacket = Codec8EParser.parsePacket(data);
+
+        // // Check if parsed data contains GPS data and IO elements
+        // if (!decodedData.gpsData || !decodedData.ioElements) {
+        //   Logger.warn(
+        //     `Received an incomplete or unrecognized packet: ${decodedData.rawData}`
+        //   );
+        //   socket.write(`Received an incomplete packet.`);
+        //   return;
+        // }
+
+        // // Save parsed data to the database
+        // await this.syncServiceData.insert(decodedData);
+
+        // Acknowledge successful data logging
+        socket.write(Buffer.from([0x01])); // Send acknowledgement byte (for example)
+        Logger.log('Data logged successfully.');
       } catch (error) {
-        Logger.error(`Error parsing data: ${error}`);
+        socket.write(`Failed to log data.`);
+        Logger.error(`Failed to log data: ${error}`);
       }
     });
 
