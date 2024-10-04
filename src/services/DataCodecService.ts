@@ -10,18 +10,27 @@ export class DataCodecService {
     this.repo = this.dataSource.getRepository(DataCodec);
   }
 
-  async insert(imei: string): Promise<DataCodec> {
-    Logger.log(`Inserting data into the database`);
+  async insert(imei: string): Promise<number> {
+    Logger.log(`Inserting data into the database with IMEI: ${imei}`);
 
-    // Create a new SyncDeviceData entity instance with the decoded data
-    const dataCodec = this.repo.create({
-      imei: imei,
-    });
+    try {
+      // Check if a record with the same IMEI already exists to prevent duplicates
+      const existingRecord = await this.repo.findOne({ where: { imei } });
+      if (existingRecord) {
+        Logger.warn(`Record with IMEI: ${imei} already exists.`);
+        throw new Error(`Record with IMEI: ${imei} already exists.`);
+      }
 
-    // Save the data in the database
-    const savedData = await this.repo.save(dataCodec);
-    Logger.log(`Data successfully saved with ID: ${savedData.id}`);
-    return savedData;
+      // Create a new SyncDeviceData entity instance with the provided IMEI
+      const dataCodec = this.repo.create({ imei });
+
+      // Save the new entity instance in the database
+      const savedData = await this.repo.save(dataCodec);
+      return savedData.id;
+    } catch (error) {
+      Logger.error(`Failed to insert data into the database. Error: ${error}`);
+      throw error;
+    }
   }
 
   async update(id: number, codec: string): Promise<DataCodec> {

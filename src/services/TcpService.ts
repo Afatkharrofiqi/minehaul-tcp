@@ -24,7 +24,7 @@ export class TcpService {
       `Client connected: ${socket.remoteAddress}:${socket.remotePort}`
     );
 
-    let lastId = '';
+    let lastId = 0;
 
     socket.on('data', async (data) => {
       Logger.log(`Received raw data: ${data.toString('hex')}`);
@@ -37,7 +37,7 @@ export class TcpService {
         if (isImeiPacket) {
           const imei = this.extractImei(data);
           Logger.log(`Received IMEI: ${imei}`);
-          lastId = this.dataCodec.insert(data.toString('hex'));
+          lastId = await this.dataCodec.insert(data.toString('hex'));
 
           // Respond to the client acknowledging the IMEI
           socket.write(Buffer.from('01', 'hex'));
