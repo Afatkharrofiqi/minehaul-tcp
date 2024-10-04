@@ -1,4 +1,3 @@
-import crc from 'crc';
 import { Server, Socket } from 'net';
 
 import { TcpConfig } from '../configs/TcpConfig';
@@ -6,194 +5,145 @@ import { TcpConfig } from '../configs/TcpConfig';
 import { Logger } from '../utils/Logger';
 import { SyncDeviceDataService } from './SyncDeviceDataService';
 
-function parseTeltonikaData(buffer: Buffer) {
-  if (!buffer || buffer.length < 15) {
-    Logger.log(
-      'Invalid or empty buffer. Please provide a valid Teltonika data buffer.'
-    );
-    return;
-  }
+interface IOElement {
+  n1IoId: number;
+  ioValue: number;
+}
 
+interface Record {
+  timestamp: bigint;
+  priority: number;
+  longitude: number;
+  latitude: number;
+  altitude: number;
+  angle: number;
+  satellites: number;
+  speed: number;
+  eventIoId: number;
+  nTotalId: number;
+  ioElements: IOElement[];
+}
+
+// Step 1: Utility function to convert a hexadecimal string to a Buffer object
+const hexToBuffer = (hex: string) => Buffer.from(hex, 'hex');
+
+// Step 2: Define a function to parse AVL data
+const parseAvlData = (hexStream: string) => {
+  const buffer = hexToBuffer(hexStream);
   let offset = 0;
 
-  // Read Preamble (4 bytes)
-  const preamble = buffer.readUInt32BE(offset);
+  // Zero Bytes (4 bytes)
+  const zeroBytes = buffer.slice(offset, offset + 4).toString('hex');
   offset += 4;
-  Logger.log(`Preamble: 0x${preamble.toString(16)}`);
 
-  // Read Data Field Length (4 bytes)
+  // Data Field Length (4 bytes)
   const dataFieldLength = buffer.readUInt32BE(offset);
   offset += 4;
-  Logger.log(`Data Field Length: ${dataFieldLength}`);
 
-  // Read Codec ID (1 byte)
+  // Codec ID (1 byte)
   const codecId = buffer.readUInt8(offset);
   offset += 1;
-  Logger.log(`Codec ID: 0x${codecId.toString(16)}`);
 
-  // Check if the Codec ID matches Codec 8 Extended (0x8e)
-  if (codecId !== 0x8e) {
-    Logger.log('Unsupported codec. Expected Codec 8 Extended.');
-    return;
-  }
-
-  // Read Number of Data 1 (1 byte)
+  // Number of Data 1 (1 byte)
   const numberOfData1 = buffer.readUInt8(offset);
   offset += 1;
-  Logger.log(`Number of Data 1: ${numberOfData1}`);
 
-  // Parse AVL Data Records based on Number of Data 1
+  const records = [];
   for (let i = 0; i < numberOfData1; i++) {
-    const no = i + 1;
-    if (buffer.length < offset + 24) {
-      // Minimum length for one AVL record (Timestamp 8 bytes + Priority 1 byte + GPS Element 15 bytes)
-      Logger.log(`Insufficient buffer length to parse AVL record ${i + 1}.`);
-      return;
-    }
-    Logger.log(`--- Data: ${no}`);
+    const record: Record = {
+      timestamp: BigInt(0),
+      priority: 0,
+      longitude: 0,
+      latitude: 0,
+      altitude: 0,
+      angle: 0,
+      satellites: 0,
+      speed: 0,
+      eventIoId: 0,
+      nTotalId: 0,
+      ioElements: [],
+    };
 
     // Timestamp (8 bytes)
-    const timestamp = buffer.readBigUInt64BE(offset);
+    record.timestamp = buffer.readBigUInt64BE(offset);
     offset += 8;
-    const date = new Date(Number(timestamp));
-    Logger.log(`Timestamp: ${isNaN(date.getTime()) ? 'Invalid Date' : date}`);
 
     // Priority (1 byte)
-    const priority = buffer.readUInt8(offset);
+    record.priority = buffer.readUInt8(offset);
     offset += 1;
 
-    // GPS Element (15 bytes)
-    const longitude = buffer.readInt32BE(offset) / 10000000;
-    const latitude = buffer.readInt32BE(offset + 4) / 10000000;
-    const altitude = buffer.readInt16BE(offset + 8);
-    const angle = buffer.readUInt16BE(offset + 10);
-    const satellites = buffer.readUInt8(offset + 12);
-    const speed = buffer.readUInt16BE(offset + 13);
-    offset += 15;
+    // Longitude (4 bytes)
+    record.longitude = buffer.readInt32BE(offset);
+    offset += 4;
 
-    Logger.log(
-      `GPS Data: Latitude: ${latitude}, Longitude: ${longitude}, Altitude: ${altitude}, Speed: ${speed}, Satellites: ${satellites}, Angle: ${angle}, Priority: ${priority}`
-    );
+    // Latitude (4 bytes)
+    record.latitude = buffer.readInt32BE(offset);
+    offset += 4;
 
-    // Event IO ID (2 bytes)
-    const eventId = buffer.readUInt16BE(offset);
+    // Altitude (2 bytes)
+    record.altitude = buffer.readInt16BE(offset);
     offset += 2;
 
-    // Total Number of Properties (2 bytes)
-    const totalIoElements = buffer.readUInt16BE(offset);
+    // Angle (2 bytes)
+    record.angle = buffer.readUInt16BE(offset);
     offset += 2;
 
-    Logger.log(`Event ID: ${eventId}, Total IO Elements: ${totalIoElements}`);
+    // Satellites (1 byte)
+    record.satellites = buffer.readUInt8(offset);
+    offset += 1;
 
-    // Parse IO elements (variable length)
-    const prevOffset = offset;
-    offset = parseIoElementsExtended(buffer, offset, totalIoElements);
+    // Speed (2 bytes)
+    record.speed = buffer.readUInt16BE(offset);
+    offset += 2;
 
-    if (offset === -1) {
-      Logger.log(`Error parsing IO Elements for record ${i + 1}.`);
-      return;
+    // Event IO ID (1 byte)
+    record.eventIoId = buffer.readUInt8(offset);
+    offset += 1;
+
+    // N of Total ID (1 byte)
+    record.nTotalId = buffer.readUInt8(offset);
+    offset += 1;
+
+    // Example of parsing N1, N2, N4, and N8 IO Elements
+    record.ioElements = [];
+    for (let j = 0; j < record.nTotalId; j++) {
+      const ioElement: IOElement = {
+        n1IoId: 0,
+        ioValue: 0,
+      };
+
+      // N1 of One Byte IO (1 byte)
+      ioElement.n1IoId = buffer.readUInt8(offset);
+      offset += 1;
+
+      // 1st IO Value (1 byte)
+      ioElement.ioValue = buffer.readUInt8(offset);
+      offset += 1;
+
+      record.ioElements.push(ioElement);
     }
 
-    // Log the bytes read and the new offset after parsing IO elements
-    Logger.log(
-      `Bytes read for IO Elements: ${offset - prevOffset}, New Offset: ${offset}`
-    );
+    records.push(record);
   }
 
-  // Read Number of Data 2 (1 byte, should match Number of Data 1)
-  if (buffer.length < offset + 1) {
-    Logger.log('Insufficient buffer length for Number of Data 2.');
-    return;
-  }
+  // Number of Data 2 (Number of Total Records) (1 byte)
   const numberOfData2 = buffer.readUInt8(offset);
   offset += 1;
-  Logger.log(`Number of Data 2: ${numberOfData2}`);
-
-  // Validate that Number of Data 1 and Number of Data 2 match
-  if (numberOfData1 !== numberOfData2) {
-    Logger.log(
-      `Number of data records mismatch between start (${numberOfData1}) and end (${numberOfData2}).`
-    );
-    return;
-  }
 
   // CRC-16 (4 bytes)
-  if (buffer.length < offset + 4) {
-    Logger.log('Insufficient buffer length for CRC.');
-    return;
-  }
-  const crc16 = buffer.readUInt32BE(offset);
+  const crc16 = buffer.slice(offset, offset + 4).toString('hex');
   offset += 4;
-  Logger.log(`CRC (From Buffer): ${crc16}`);
 
-  // Calculate CRC for validation
-  const calculatedCrc16 = crc.crc16modbus(buffer.subarray(4, offset - 4)); // Calculate CRC for the data excluding preamble and CRC itself
-  Logger.log(`Calculated CRC: ${calculatedCrc16}`);
-
-  if (crc16 !== calculatedCrc16) {
-    Logger.log(
-      `CRC Error: Expected ${crc16}, but calculated ${calculatedCrc16}`
-    );
-    return;
-  }
-
-  Logger.log('Data parsed successfully');
-}
-
-// Updated Function to Parse IO Elements for Codec 8 Extended
-function parseIoElementsExtended(
-  buffer: Buffer,
-  offset: number,
-  totalElements: number
-) {
-  Logger.log(`Parsing ${totalElements} IO Elements...`);
-
-  for (let i = 0; i < totalElements; i++) {
-    // Ensure we have at least 2 bytes to read the IO ID
-    if (buffer.length < offset + 2) {
-      Logger.log(`Insufficient buffer length for IO Element ID at index ${i}.`);
-      return -1;
-    }
-
-    // Read IO ID (2 bytes)
-    const ioId = buffer.readUInt16BE(offset);
-    offset += 2;
-
-    // Determine the length of the IO value based on the configuration
-    const ioValueLength = getIoValueLength(ioId);
-    Logger.log(
-      `Current Offset: ${offset}, IO ID: ${ioId}, Expected IO Value Length: ${ioValueLength}`
-    );
-
-    if (buffer.length < offset + ioValueLength) {
-      Logger.log(
-        `Insufficient buffer length for IO Value of IO ID ${ioId}. Expected Length: ${ioValueLength}, Available Length: ${buffer.length - offset}`
-      );
-      return -1;
-    }
-
-    // Read IO Value (variable length)
-    let ioValue;
-    if (ioValueLength > 0) {
-      ioValue = buffer.readUIntBE(offset, ioValueLength);
-    } else {
-      ioValue = buffer.readUInt8(offset);
-    }
-    offset += ioValueLength;
-
-    Logger.log(`IO Element ID: ${ioId}, Value: ${ioValue}`);
-  }
-
-  return offset;
-}
-
-// Helper function to determine IO element length based on ID (this is a simplified version, adjust as necessary)
-function getIoValueLength(ioId: number): number {
-  // This should be defined based on the specific IO ID mappings and lengths in the Teltonika documentation
-  if (ioId >= 0 && ioId <= 255) return 1; // Length of 1 byte for IO IDs 0-255
-  if (ioId >= 256 && ioId <= 65535) return 2; // Length of 2 bytes for IO IDs 256-65535
-  return 4; // Default length for other IO elements
-}
+  return {
+    zeroBytes,
+    dataFieldLength,
+    codecId,
+    numberOfData1,
+    records,
+    numberOfData2,
+    crc16,
+  };
+};
 
 export class TcpService {
   private server: Server;
@@ -208,42 +158,55 @@ export class TcpService {
       `Client connected: ${socket.remoteAddress}:${socket.remotePort}`
     );
 
+    let isImeiVerified = false;
+
+    // Buffer to store partial data until the complete packet is received
+    let dataBuffer: Buffer = Buffer.alloc(0);
+
     socket.on('data', async (data) => {
-      Logger.log(`Data length: ${data.length} bytes`);
+      Logger.log(`Received data: ${data.toString('hex')}`);
 
-      try {
-        // Handle initial IMEI packet (17 bytes long)
-        if (data.length === 17) {
-          const imei = data.subarray(2).toString('ascii');
-          Logger.log(`Received IMEI: ${imei}`);
-          // Acknowledge IMEI reception
-          socket.write(Buffer.from([0x01]));
-          return;
+      // If IMEI is not verified, check and validate the IMEI first
+      if (!isImeiVerified) {
+        // Assuming IMEI is sent as a 15-byte ASCII string
+        const imei = data.toString('ascii').trim();
+        Logger.log(`Received IMEI: ${imei}`);
+
+        // Check if the IMEI is valid (15 digits)
+        if (/^\d{15}$/.test(imei)) {
+          // Send acknowledgment for IMEI verification
+          const imeiAck = Buffer.from('01', 'hex'); // Custom acknowledgment for IMEI validation
+          socket.write(imeiAck);
+          Logger.log('IMEI verified successfully');
+
+          isImeiVerified = true;
+        } else {
+          Logger.log('Invalid IMEI received');
+          socket.end(); // Close the connection for invalid IMEI
         }
+      } else {
+        // Append incoming data to buffer
+        dataBuffer = Buffer.concat([dataBuffer, data]);
 
-        parseTeltonikaData(data);
+        try {
+          // Assuming the data ends with a CRC-16 (4 bytes), validate its length
+          if (dataBuffer.length >= 4) {
+            const hexStream = dataBuffer.toString('hex');
+            const parsedData = parseAvlData(hexStream);
 
-        // Decode the incoming data using Codec8E parser
-        // const decodedData: DecodedPacket = Codec8EParser.parsePacket(data);
+            Logger.log(`Parsed Data: ${parsedData}`);
 
-        // // Check if parsed data contains GPS data and IO elements
-        // if (!decodedData.gpsData || !decodedData.ioElements) {
-        //   Logger.warn(
-        //     `Received an incomplete or unrecognized packet: ${decodedData.rawData}`
-        //   );
-        //   socket.write(`Received an incomplete packet.`);
-        //   return;
-        // }
+            // Send acknowledgment after complete data reception
+            const receptionAck = Buffer.from('00000001', 'hex'); // Custom acknowledgment after full packet
+            socket.write(receptionAck);
+            Logger.log('Data reception acknowledged');
 
-        // // Save parsed data to the database
-        // await this.syncServiceData.insert(decodedData);
-
-        // Acknowledge successful data logging
-        socket.write(Buffer.from([0x01])); // Send acknowledgement byte (for example)
-        Logger.log('Data logged successfully.');
-      } catch (error) {
-        socket.write(`Failed to log data.`);
-        Logger.error(`Failed to log data: ${error}`);
+            // Clear buffer after processing
+            dataBuffer = Buffer.alloc(0);
+          }
+        } catch (error) {
+          Logger.error(`Error parsing AVL data: ${error}`);
+        }
       }
     });
 
