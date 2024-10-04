@@ -5,6 +5,7 @@ import { Database } from './configs/Database';
 import { TcpController } from './controllers/TcpController';
 import { ApiRouter } from './routes/ApiRouter';
 import { TcpRoute } from './routes/v1/TcpRoute';
+import { DataCodecService } from './services/DataCodecService';
 import { SyncDeviceDataService } from './services/SyncDeviceDataService';
 import { TcpService } from './services/TcpService';
 
@@ -15,7 +16,8 @@ export class Bootstrap {
     const syncDeviceDataService = new SyncDeviceDataService(
       dataSource.getDataSource()
     );
-    const tcpService = new TcpService(syncDeviceDataService);
+    const dataCodec = new DataCodecService(dataSource.getDataSource());
+    const tcpService = new TcpService(syncDeviceDataService, dataCodec);
 
     const tcpController = new TcpController(tcpService);
 
